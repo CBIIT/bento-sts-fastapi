@@ -1,16 +1,10 @@
-import os
 from logging import getLogger
 from fastapi import Request
-from bento_meta.mdb import SearchableMDB
-from dotenv import load_dotenv
+from .mdb import MDBReader
+from pdb import set_trace
 
-load_dotenv()
 logger = getLogger()
-
-mdb = SearchableMDB(
-    os.getenv("NEO4J_MDB_URI"),
-    os.getenv("NEO4J_MDB_USER"),
-    os.getenv("NEO4J_MDB_PASS"))
+mdb = MDBReader()
 
 
 def paging_params(request: Request, skip: int = 0, limit: int = 0):
