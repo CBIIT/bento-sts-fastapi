@@ -2,7 +2,6 @@ from fastapi import APIRouter, Depends, Request
 from ..dependencies import paging_params
 from typing import List
 from ..pymodels import Model
-from ..converters import toModel
 
 router = APIRouter(
     prefix="/models",
@@ -24,9 +23,6 @@ def models_get(request: Request) -> List[Model]:
         stmt,
         {}
     )
-    # ret = []
-    # for row in rows:
-    #     ret.append(toModel(row['model']))
     return rows
     
 

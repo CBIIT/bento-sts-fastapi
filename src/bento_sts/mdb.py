@@ -54,6 +54,9 @@ class MDBReader(object):
         except Exception as e:
             logger.warning(f"MDB not connected: {e}")
 
+    def close(self):
+        self.driver.close()
+        
     @read_txn
     def get_with_statement(self, qry: str, parms: dict = {}):
         """Run an arbitrary read statement and return data."""

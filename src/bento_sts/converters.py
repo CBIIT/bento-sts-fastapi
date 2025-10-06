@@ -1,6 +1,6 @@
 from logging import getLogger
 from neo4j.graph import Node as neoNode
-from pydantic_core import BaseModel
+from pydantic import BaseModel
 from .pymodels import (
     Model, Node, Property,
     Relationship, Concept, ValueSet,
@@ -44,8 +44,11 @@ def neo_to_cde(neo_node: neoNode):
         )
         return
     props = dict(neo_node.items())
+    vers = props.get('origin_version')
+    if not vers:
+        logger.warning(f"caDSR term with nanoid '{props['nanoid']}' is missing 'origin_version'")
     return CDE(
         CDECode=props['origin_id'],
-        CDEVersion=props['origin_version'],
+        CDEVersion=vers,
         CDEFullName=props['value'],
     )

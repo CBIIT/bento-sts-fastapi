@@ -16,6 +16,7 @@ class Model(Entity):
     name: str | None = None
     repo: Url | None = None
     is_latest_version: bool
+    nanoid: str | None = None
 
 
 class Node(Entity):
@@ -54,6 +55,7 @@ class Tag(BaseModel):
 
 class Relationship(Entity):
     _type: Literal['Relationship'] = 'Relationship'
+    model: str
 
 
 class Concept(Entity):
@@ -71,7 +73,7 @@ class Predicate(Entity):
 class CDE(BaseModel):
     _type: Literal['CDE'] = 'CDE'
     CDECode: str
-    CDEVersion: str
+    CDEVersion: str | None = None
     CDEFullName: str
 
 
