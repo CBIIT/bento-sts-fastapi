@@ -1,0 +1,6 @@
+services:
+  test-mdb:
+    image: 'maj1/test-mdb'
+    ports:
+      - "7474"
+      - "7687"

@@ -9,12 +9,15 @@ dependencies = [
     "datamodel-code-generator>=0.34.0",
     "fastapi[standard]>=0.118.0",
     "pydotenv>=0.0.7",
+    "pytest>=8.4.2",
+    "pytest-docker>=3.2.3",
     "semver>=3.0.4",
 ]
 
 [dependency-groups]
 dev = [
     "openapi-python-client>=0.26.1",
+    "pytest-docker>=3.2.3",
 ]
 
 [tool.uv.sources]

@@ -13,9 +13,7 @@ router = APIRouter(
     summary="Get MDB entity with specified nanoid"
 )
 def id_id_get(request: Request, id: str):
-    stmt = " ".join(['[MATCH (n0 {nanoid:$p0}) RETURN n0',
-                     f"SKIP {request.state.skip} " if request.state.skip else "",
-                     f"LIMIT {request.state.limit}" if request.state.limit else ""])
+    stmt = 'MATCH (n0 {nanoid:$p0}) RETURN n0'
     ret = request.state.mdb.get_with_statement(
         stmt,
         {"p0": id}
