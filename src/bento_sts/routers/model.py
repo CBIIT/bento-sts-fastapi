@@ -1,5 +1,8 @@
 from fastapi import APIRouter, Depends, Request
+from typing import List
 from ..dependencies import paging_params
+from ..converters import neo_to_py
+from ..pymodels import Node, Property, Term
 
 router = APIRouter(
     prefix="/model",
@@ -13,15 +16,20 @@ router = APIRouter(
     "/{modelHandle}/version/{versionString}/nodes",
     summary="Get all nodes for specified model"
 )
-def model_model_handle_nodes_get(request: Request, modelHandle: str, versionString: str):
+def model_model_handle_nodes_get(
+        request: Request,
+        modelHandle: str, versionString: str) -> List[Node]:
     stmt = " ".join([
-        'MATCH (n0:node {model:$p0,version:$p1}) RETURN n0 as nodes',
+        'MATCH (n0:node {model:$p0,version:$p1}) RETURN n0',
         f"SKIP {request.state.skip} " if request.state.skip else "",
         f"LIMIT {request.state.limit}" if request.state.limit else ""])
-    ret = request.state.mdb.get_with_statement(
+    rows = request.state.mdb.get_with_statement(
         stmt,
         {"p0": modelHandle, "p1": versionString}
     )
+    ret = []
+    for row in rows:
+        ret.append(neo_to_py(row['n0']))
     return ret
     
 

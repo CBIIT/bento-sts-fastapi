@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, Request
-from ..dependencies import paging_params
+from bento_sts.converters import neo_to_py
+from bento_sts.pymodels import Entity, Term
 
 router = APIRouter(
     prefix="/id",
@@ -12,10 +13,11 @@ router = APIRouter(
     "/{id}",
     summary="Get MDB entity with specified nanoid"
 )
-def id_id_get(request: Request, id: str):
+def id_id_get(request: Request, id: str) -> Entity | Term:
     stmt = 'MATCH (n0 {nanoid:$p0}) RETURN n0'
     ret = request.state.mdb.get_with_statement(
         stmt,
         {"p0": id}
     )
-    return ret
+    return neo_to_py(ret[0]['n0'])
+

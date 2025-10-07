@@ -5,14 +5,14 @@ from pydantic import BaseModel
 
 
 class Entity(BaseModel):
-    _type: str
+    type: str
     handle: str | None = None
     version: str | None = None
     nanoid: str
 
 
 class Model(Entity):
-    _type: Literal['Model'] = 'Model'
+    type: Literal['Model'] = 'Model'
     name: str | None = None
     repo: Url | None = None
     is_latest_version: bool
@@ -20,12 +20,12 @@ class Model(Entity):
 
 
 class Node(Entity):
-    _type: Literal['Node'] = 'Node'
+    type: Literal['Node'] = 'Node'
     model: str
 
 
 class Property(Entity):
-    _type: Literal['Property'] = 'Property'
+    type: Literal['Property'] = 'Property'
     model: str
     is_key: bool | None = None
     is_strict: bool | None = None
@@ -38,40 +38,41 @@ class Property(Entity):
 
 
 class Term(BaseModel):
-    _type: Literal['Term'] = 'Term'
+    type: Literal['Term'] = 'Term'
     value: str
     origin_name: str
     handle: str | None = None
     origin_version: str | None = None
     origin_id: str | None = None
+    nanoid: str
 
 
 class Tag(BaseModel):
-    _type: Literal['Tag'] = 'Tag'
+    type: Literal['Tag'] = 'Tag'
     key: str
     value: str
     nanoid: str
 
 
 class Relationship(Entity):
-    _type: Literal['Relationship'] = 'Relationship'
+    type: Literal['Relationship'] = 'Relationship'
     model: str
 
 
 class Concept(Entity):
-    _type: Literal['Concept'] = 'Concept'
+    type: Literal['Concept'] = 'Concept'
 
 
 class ValueSet(Entity):
-    _type: Literal['ValueSet'] = 'ValueSet'
+    type: Literal['ValueSet'] = 'ValueSet'
 
 
 class Predicate(Entity):
-    _type: Literal['Predicate'] = 'Predicate'
+    type: Literal['Predicate'] = 'Predicate'
 
 
 class CDE(BaseModel):
-    _type: Literal['CDE'] = 'CDE'
+    type: Literal['CDE'] = 'CDE'
     CDECode: str
     CDEVersion: str | None = None
     CDEFullName: str
