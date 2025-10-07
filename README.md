@@ -7,3 +7,7 @@ on [FastAPI](https://fastapi.tiangolo.com). It is a pure API without a GUI
 interface.
 
 More details coming.
+
+# Install and run
+
+* soon
