@@ -3,11 +3,14 @@ name = "bento-sts"
 version = "2.0.0"
 description = "FastAPI implementation of Simple Terminology Service"
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.10"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: Apache Software License"
+]
 dependencies = [
-    "bento-meta>=0.2.18",
-    "datamodel-code-generator>=0.34.0",
     "fastapi[standard]>=0.118.0",
+    "neo4j>=6.0.2",
     "pydotenv>=0.0.7",
     "pytest>=8.4.2",
     "pytest-docker>=3.2.3",
@@ -19,6 +22,3 @@ dev = [
     "openapi-python-client>=0.26.1",
     "pytest-docker>=3.2.3",
 ]
-
-[tool.uv.sources]
-bento-meta = { path = "../../../Code/bento-meta/python" }
