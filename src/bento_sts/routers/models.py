@@ -1,37 +1,50 @@
+import semver
 from fastapi import APIRouter, Depends, Request
-from ..dependencies import paging_params
 from typing import List
+from functools import cmp_to_key
+from ..dependencies import paging_params
+from ..converters import neo_to_py
 from ..pymodels import Model
 
 router = APIRouter(
     prefix="/models",
     tags=["models"],
-    dependencies=[Depends(paging_params)],
     responses={404: {"description": "Not found."}},
     )
 
+
 @router.get(
     "/",
-    summary="Get info on available models"
+    summary="Get info on available models",
+    dependencies=[Depends(paging_params)],
 )
 def models_get(request: Request) -> List[Model]:
+    def cmp_model(m: Model, n: Model):
+        if (m.name == n.name):
+            return semver.compare(m.version, n.version)
+        else:
+            return -1 if m.name < n.name else 1
+        
     stmt = " ".join(
         ['MATCH (n0:model) RETURN n0 as model',
          f"SKIP {request.state.skip} " if request.state.skip else "",
          f"LIMIT {request.state.limit}" if request.state.limit else ""])
+    ret = []
     rows = request.state.mdb.get_with_statement(
         stmt,
         {}
     )
-    return rows
-    
+    for row in rows:
+        ret.append(neo_to_py(row['model']))
+    return sorted(ret, key=cmp_to_key(cmp_model))
+
 
 @router.get(
-    "/models/count",
+    "/count",
     summary="Get number of available models"
 )
 def models_count_get(request: Request) -> int:
-    stmt = 'MATCH (n0:model) RETURN count(*) as count'
+    stmt = 'MATCH (n0:model) RETURN count(n0) as count'
     ret = request.state.mdb.get_with_statement(
         stmt,
         {}

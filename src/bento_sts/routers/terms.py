@@ -1,5 +1,7 @@
 from fastapi import APIRouter, Depends, Request
 from ..dependencies import paging_params
+from ..pymodels import Term, CDE
+from ..converters import neo_to_py, neo_to_cde
 
 router = APIRouter(
     prefix="/terms",

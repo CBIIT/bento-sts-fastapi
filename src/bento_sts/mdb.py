@@ -9,6 +9,7 @@ import logging
 from functools import wraps
 from neo4j import GraphDatabase
 from dotenv import load_dotenv
+from fastapi import HTTPException
 from pdb import set_trace
 
 # Decorator functions to produce executed transactions based on an
@@ -23,6 +24,7 @@ def read_txn(func):
     its query.
     Query function should return a tuple (qry_string, param_dict).
     Returns list of driver Records.
+    If a query returns 0 records, raise an HTTPException
     """
 
     @wraps(func)
@@ -33,6 +35,9 @@ def read_txn(func):
             return [rec for rec in result]
         with self.driver.session() as session:
             result = session.execute_read(txn_q)
+            if len(result) == 0:
+                raise HTTPException(status_code=404,
+                                    detail="No records found.")
             return result
     return rd
 

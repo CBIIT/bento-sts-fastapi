@@ -1,20 +1,59 @@
+import semver
+from functools import cmp_to_key
 from fastapi import APIRouter, Depends, Request
 from typing import List
 from ..dependencies import paging_params
 from ..converters import neo_to_py
-from ..pymodels import Node, Property, Term
+from ..pymodels import Model, Node, Property, Term
 
 router = APIRouter(
     prefix="/model",
     tags=["model"],
-    dependencies=[Depends(paging_params)],
     responses={404: {"description": "Not found."}},
     )
 
 
 @router.get(
+    "/{modelHandle}/versions",
+    summary="Get all versions for specified model",
+    dependencies=[Depends(paging_params)],
+)
+def model_model_versions_get(
+        request: Request, modelHandle: str) -> List[str]:
+    stmt = " ".join([
+        'MATCH (n0:model {name:$p0}) return n0.version as version order by version',
+        f"SKIP {request.state.skip} " if request.state.skip else "",
+        f"LIMIT {request.state.limit}" if request.state.limit else ""])
+    rows = request.state.mdb.get_with_statement(
+        stmt,
+        {"p0": modelHandle}
+    )
+    ret = []
+    for row in rows:
+        ret.append(row['version'])
+    
+    return sorted(ret, key=cmp_to_key(semver.compare))
+
+
+@router.get(
+    "/{modelHandle}/latest-version",
+    summary="Get latest version of specified model",
+    dependencies=[Depends(paging_params)],
+)
+def model_model_latest_version_get(
+        request: Request, modelHandle: str) -> Model:
+    stmt = 'MATCH (n0:model {name:$p0}) where n0.is_latest_version return n0'
+    ret = request.state.mdb.get_with_statement(
+        stmt,
+        {"p0": modelHandle}
+    )
+    return neo_to_py(ret[0]['n0'])
+
+
+@router.get(
     "/{modelHandle}/version/{versionString}/nodes",
-    summary="Get all nodes for specified model"
+    summary="Get all nodes for specified model",
+    dependencies=[Depends(paging_params)],
 )
 def model_model_handle_nodes_get(
         request: Request,
@@ -31,53 +70,56 @@ def model_model_handle_nodes_get(
     for row in rows:
         ret.append(neo_to_py(row['n0']))
     return ret
-    
+
 
 @router.get(
     "/{modelHandle}/version/{versionString}/nodes/count",
     summary="Get number of nodes for specified model"
 )
-def model_model_handle_nodes_count_get(request: Request, modelHandle: str, versionString: str):
-    stmt = " ".join([
-        'MATCH (n0:node {model:$p0,version:$p1}) RETURN count(n0) as count',
-        f"SKIP {request.state.skip} " if request.state.skip else ""
-        f"LIMIT {request.state.limit}" if request.state.limit else ""])
+def model_model_handle_nodes_count_get(request: Request, modelHandle: str, versionString: str) -> int:
+    stmt = 'MATCH (n0:node {model:$p0,version:$p1}) RETURN count(n0) as count'
     ret = request.state.mdb.get_with_statement(
         stmt,
         {"p0": modelHandle, "p1": versionString}
     )
-    return ret
+    return ret[0]['count']
     
 
 @router.get(
     "/{modelHandle}/version/{versionString}/node/{nodeHandle}",
     summary="Retrieve a specified node from a model"
 )
-def model_model_handle_node_node_handle_get(request: Request, modelHandle: str, versionString: str, nodeHandle: str):
-    stmt = " ".join([
-        'MATCH (n0:node {model:$p0,version:$p1,handle:$p2}) RETURN n0 as node',
-        f"SKIP {request.state.skip} " if request.state.skip else ""
-        f"LIMIT {request.state.limit}" if request.state.limit else ""])
-    ret = request.state.mdb.get_with_statement(
+def model_model_handle_node_node_handle_get(request: Request, modelHandle: str, versionString: str, nodeHandle: str) -> Node:
+    stmt = 'MATCH (n0:node {model:$p0,version:$p1,handle:$p2}) RETURN n0 as node'
+    ret = []
+    rows = request.state.mdb.get_with_statement(
         stmt,
         {"p0": modelHandle, "p1": versionString, "p2": nodeHandle}
     )
-    return ret
+    return neo_to_py(rows[0]['node'])
     
 
 @router.get(
     "/{modelHandle}/version/{versionString}/node/{nodeHandle}/properties",
-    summary="Get all properties for specified node"
+    summary="Get all properties for specified node",
+    dependencies=[Depends(paging_params)],
 )
-def model_model_handle_node_node_handle_properties_get(request: Request, modelHandle: str, versionString: str, nodeHandle: str):
+def model_model_handle_node_node_handle_properties_get(
+        request: Request,
+        modelHandle: str, versionString: str,
+        nodeHandle: str) -> List[Property]:
     stmt = " ".join([
-        'MATCH (n0:node {model:$p0,version:$p1,handle:$p2})-[r0:has_property]->(n1:property) RETURN n1 as properties',
+        'MATCH (n0:node {model:$p0,version:$p1,handle:$p2})-[r0:has_property]->(n1:property) RETURN n1 as prop',
         f"SKIP {request.state.skip} " if request.state.skip else "",
         f"LIMIT {request.state.limit}" if request.state.limit else ""])
-    ret = request.state.mdb.get_with_statement(
+    ret=[]
+    rows = request.state.mdb.get_with_statement(
         stmt,
         {"p0": modelHandle, "p1": versionString, "p2": nodeHandle}
     )
+    for row in rows:
+        ret.append(neo_to_py(row['prop']))
+    
     return ret
     
 
@@ -85,47 +127,50 @@ def model_model_handle_node_node_handle_properties_get(request: Request, modelHa
     "/{modelHandle}/version/{versionString}/node/{nodeHandle}/properties/count",
     summary="Get number of  properties for specified node"
 )
-def model_model_handle_node_node_handle_properties_count_get(request: Request, modelHandle: str, versionString: str, nodeHandle: str):
-    stmt = " ".join([
-        'MATCH (n0:node {model:$p0,version:$p1,handle:$p2})-[r0:has_property]->(n1:property) RETURN count(n1) as count',
-        f"SKIP {request.state.skip} " if request.state.skip else "",
-        f"LIMIT {request.state.limit}" if request.state.limit else ""])
+def model_model_handle_node_node_handle_properties_count_get(request: Request, modelHandle: str, versionString: str, nodeHandle: str) -> int:
+    stmt = 'MATCH (n0:node {model:$p0,version:$p1,handle:$p2})-[r0:has_property]->(n1:property) RETURN count(n1) as count'
     ret = request.state.mdb.get_with_statement(
         stmt,
         {"p0": modelHandle, "p1": versionString, "p2": nodeHandle}
     )
-    return ret
+    return ret[0]['count']
     
 
 @router.get(
     "/{modelHandle}/version/{versionString}/node/{nodeHandle}/property/{propHandle}",
     summary="Retrieve a specified property from a model"
 )
-def model_model_handle_node_node_handle_property_prop_handle_get(request: Request, modelHandle: str, versionString: str, nodeHandle: str, propHandle: str):
-    stmt = " ".join([
-        'MATCH (n0:node {model:$p0,version:$p1,handle:$p2})-[r0:has_property]->(n1:property {handle:$p3}) RETURN n1 as property',
-        f"SKIP {request.state.skip} " if request.state.skip else "",
-        f"LIMIT {request.state.limit}" if request.state.limit else ""])
+def model_model_handle_node_node_handle_property_prop_handle_get(
+        request: Request, modelHandle: str, versionString: str,
+        nodeHandle: str, propHandle: str) -> Property:
+    stmt = 'MATCH (n0:node {model:$p0,version:$p1,handle:$p2})-[r0:has_property]->(n1:property {handle:$p3}) RETURN n1 as prop'
     ret = request.state.mdb.get_with_statement(
         stmt,
         {"p0": modelHandle, "p1": versionString, "p2": nodeHandle, "p3": propHandle}
     )
-    return ret
+    return neo_to_py(ret[0]['prop'])
     
 
 @router.get(
     "/{modelHandle}/version/{versionString}/node/{nodeHandle}/property/{propHandle}/terms",
-    summary="Get the terms (acceptable values) for specified property, if applicable to property."
+    summary="Get the terms (acceptable values) for specified property, if applicable to property.",
+    dependencies=[Depends(paging_params)],
 )
-def model_model_handle_node_node_handle_property_prop_handle_terms_get(request: Request, modelHandle: str, versionString: str, nodeHandle: str, propHandle: str):
+def model_model_handle_node_node_handle_property_prop_handle_terms_get(
+        request: Request,
+        modelHandle: str, versionString: str,
+        nodeHandle: str, propHandle: str) -> List[Term]:
     stmt = " ".join([
-        'MATCH (n0:node {model:$p0,version:$p1,handle:$p2})-[r0:has_property]->(n1:property {handle:$p3})-[r1:has_value_set]->(n3:value_set)-[r2:has_term]->(n2:term) RETURN n2 as terms',
+        'MATCH (n0:node {model:$p0,version:$p1,handle:$p2})-[r0:has_property]->(n1:property {handle:$p3})-[r1:has_value_set]->(n3:value_set)-[r2:has_term]->(n2:term) RETURN n2 as term',
         f"SKIP {request.state.skip} " if request.state.skip else "",
         f"LIMIT {request.state.limit}" if request.state.limit else ""])
-    ret = request.state.mdb.get_with_statement(
+    ret = []
+    rows = request.state.mdb.get_with_statement(
         stmt,
         {"p0": modelHandle, "p1": versionString, "p2": nodeHandle, "p3": propHandle}
     )
+    for row in rows:
+        ret.append(neo_to_py(row['term']))
     return ret
     
 
@@ -133,30 +178,10 @@ def model_model_handle_node_node_handle_property_prop_handle_terms_get(request: 
     "/{modelHandle}/version/{versionString}/node/{nodeHandle}/property/{propHandle}/terms/count",
     summary="Get number of  properties for specified node"
 )
-def model_model_handle_node_node_handle_property_prop_handle_terms_count_get(request: Request, modelHandle: str, versionString: str, nodeHandle: str, propHandle: str):
-    stmt = " ".join([
-        'MATCH (n0:node {model:$p0,version:$p1,handle:$p2})-[r0:has_property]->(n1:property {handle:$p3})-[r1:has_value_set]->(n3:value_set)-[r2:has_term]->(n2:term) RETURN count(*) as count',
-        f"SKIP {request.state.skip} " if request.state.skip else "",
-        f"LIMIT {request.state.limit}" if request.state.limit else ""])
+def model_model_handle_node_node_handle_property_prop_handle_terms_count_get(request: Request, modelHandle: str, versionString: str, nodeHandle: str, propHandle: str) -> int:
+    stmt = 'MATCH (n0:node {model:$p0,version:$p1,handle:$p2})-[r0:has_property]->(n1:property {handle:$p3})-[r1:has_value_set]->(n3:value_set)-[r2:has_term]->(n2:term) RETURN count(*) as count'
     ret = request.state.mdb.get_with_statement(
         stmt,
         {"p0": modelHandle, "p1": versionString, "p2": nodeHandle, "p3": propHandle}
     )
-    return ret
-    
-
-@router.get(
-    "/{modelHandle}/version/{versionString}/node/{nodeHandle}/property/{propHandle}/term/{termValue}",
-    summary="Retrieve a specified term from a property\'s acceptable value set"
-)
-def model_model_handle_node_node_handle_property_prop_handle_term_term_value_get(request: Request, termValue: str):
-    stmt = " ".join([
-        'MATCH (n2:term {value:$p4}) RETURN n2 as term',
-        f"SKIP {request.state.skip} " if request.state.skip else "",
-        f"LIMIT {request.state.limit}" if request.state.limit else ""])
-    ret = request.state.mdb.get_with_statement(
-        stmt,
-        {"p4": termValue}
-    )
-    return ret
-
+    return ret[0]['count']

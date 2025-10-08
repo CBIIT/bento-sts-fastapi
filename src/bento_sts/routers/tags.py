@@ -1,27 +1,33 @@
 from fastapi import APIRouter, Depends, Request
+from typing import List
 from ..dependencies import paging_params
+from ..converters import neo_to_py
+from ..pymodels import Tag
 
 router = APIRouter(
     prefix="/tags",
     tags=["tags"],
-    dependencies=[Depends(paging_params)],
     responses={404: {"description": "Not found."}},
     )
 
 
 @router.get(
     "/",
-    summary="Get all tag nodes in MDB"
+    summary="Get all tag nodes in MDB",
+    dependencies=[Depends(paging_params)],
 )
-def tags_get(request: Request):
+def tags_get(request: Request) -> List[Tag]:
     stmt = " ".join([
-        'MATCH (n0:tag) RETURN n0 as tags',
+        'MATCH (n0:tag) RETURN n0 as tag',
         f"SKIP {request.state.skip} " if request.state.skip else "",
         f"LIMIT {request.state.limit}" if request.state.limit else ""])
-    ret = request.state.mdb.get_with_statement(
+    ret = []
+    rows = request.state.mdb.get_with_statement(
         stmt,
         {}
     )
+    for row in rows:
+        ret.append(neo_to_py(row['tag']))
     return ret
 
 
@@ -29,10 +35,10 @@ def tags_get(request: Request):
     "/count",
     summary="Get number of tags present in MDB"
 )
-def tags_count_get(request: Request):
-    stmt = 'MATCH (n0:tag) RETURN count(*) as count'
+def tags_count_get(request: Request) -> int:
+    stmt = 'MATCH (n0:tag) RETURN count(n0) as count'
     ret = request.state.mdb.get_with_statement(
         stmt,
         {}
     )
-    return ret
+    return ret[0]['count']
