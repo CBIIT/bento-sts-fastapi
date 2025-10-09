@@ -72,8 +72,7 @@ an interactive Swagger user interface that will list all the endpoints and allow
 
 The dev server will automatically reload as you change the code.
 
-## Code Structure
-
+## Code Structure and Flow
 
 At the top level directory are configuration files like `.env`, 
 [pyproject.toml](/pyproject.toml), the virtual env created by uv (`.venv`), the [src](/src), and the [tests](/tests) subdirectory.
@@ -101,7 +100,10 @@ at [https://fastapi.tiangolo.com/tutorial/bigger-applications/](https://fastapi.
 ![sts_code_flow](./bento-sts-guts.png "bento-sts code flow")
 
 The [mdb.py](/src/bento_sts/mdb.py) provides a self-contained `MDBReader` class to perform
-the actual Neo4j queries. The `bento-meta` dependency has been removed.
+the actual Neo4j queries. The `bento-meta` dependency has been removed. `MDBReader` will
+create a db connection using the environment variables set in `.env`. Run any read query
+using the `get\_with\_statement()` method. The query result is returned as an array of
+[Records](https://neo4j.com/docs/api/python-driver/6.0/api.html#neo4j.Record) as output by the [Neo4j python driver](https://neo4j.com/docs/api/python-driver/6.0/index.html).
 
 The API endpoints and associated DB queries are organized in the files in the 
 [routers](/src/bento_sts/routers) directory. The endpoints for `/models/...` are in 
@@ -114,5 +116,7 @@ API path to start with `/v2`.
 [pymodels.py](/src/bento_sts/sts.py) defines all the [Pydantic data classes](https://docs.pydantic.dev/latest/concepts/models/#basic-model-usage)
 that are used to standardize, validate, and JSON-serialize the API repsonse bodies.
 
-[converters.py](/src/bento_sts/converters.py) define methods that convert 
+[converters.py](/src/bento_sts/converters.py) define methods that convert Neo4j driverrecords 
+to Pydantic data objects. There is one main method `neo_to_py` that should work for any type
+of MDB graph node returned by a query. 
 
