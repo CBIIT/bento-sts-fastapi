@@ -75,6 +75,44 @@ The dev server will automatically reload as you change the code.
 ## Code Structure
 
 
+At the top level directory are configuration files like `.env`, 
+[pyproject.toml](/pyproject.toml), the virtual env created by uv (`.venv`), the [src](/src), and the [tests](/tests) subdirectory.
 
-The API endpoints and associated DB queries are distributed among the files in the 
-[routers](/src/bento_sts/routers) directory. 
+
+The code in [src/bento\_sts](/src/bento\_sts) is organized more or less as suggested
+at [https://fastapi.tiangolo.com/tutorial/bigger-applications/](https://fastapi.tiangolo.com/tutorial/bigger-applications/):
+
+    .
+    ├── __init__.py
+    ├── converters.py
+    ├── dependencies.py
+    ├── mdb.py
+    ├── pymodels.py
+    ├── routers
+    │   ├── __init__.py
+    │   ├── id.py
+    │   ├── model.py
+    │   ├── models.py
+    │   ├── tag.py
+    │   ├── tags.py
+    │   └── terms.py
+    └── sts.py
+
+![sts_code_flow](./bento-sts-guts.png "bento-sts code flow")
+
+The [mdb.py](/src/bento_sts/mdb.py) provides a self-contained `MDBReader` class to perform
+the actual Neo4j queries. The `bento-meta` dependency has been removed.
+
+The API endpoints and associated DB queries are organized in the files in the 
+[routers](/src/bento_sts/routers) directory. The endpoints for `/models/...` are in 
+[models.py](/src/bento_sts/models.py), the endpoints for `/tag/...` in 
+[tag.py](/src/bento_sts/tag.py), and so on.
+
+[sts.py](/src/bento_sts/sts.py) basically aggregates all these endpoints and defines the
+API path to start with `/v2`.
+
+[pymodels.py](/src/bento_sts/sts.py) defines all the [Pydantic data classes](https://docs.pydantic.dev/latest/concepts/models/#basic-model-usage)
+that are used to standardize, validate, and JSON-serialize the API repsonse bodies.
+
+[converters.py](/src/bento_sts/converters.py) define methods that convert 
+
