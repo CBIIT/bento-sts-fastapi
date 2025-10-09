@@ -6,8 +6,4 @@ This code is a rewrite of [bento-sts](https://github.com/CBIIT/bento-sts), based
 on [FastAPI](https://fastapi.tiangolo.com). It is a pure API without a GUI 
 interface.
 
-More details coming.
-
-# Install and run
-
-* soon
+See [this page](/devinfo.md) for more details.
