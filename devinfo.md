@@ -120,3 +120,28 @@ that are used to standardize, validate, and JSON-serialize the API repsonse bodi
 to Pydantic data objects. There is one main method `neo_to_py` that should work for any type
 of MDB graph node returned by a query. 
 
+## Testing
+
+We use [Pytest](https://docs.pytest.org/en/latest/index.html) for unit testing. Test files 
+go in the [tests](/tests) directory. Look there for examples.
+
+FastAPI provides a very convenient
+[TestClient](https://fastapi.tiangolo.com/tutorial/testing/?h=run#using-testclient)
+class for creating a client that just works. However, since STS needs
+a backend Neo4j database to run, pytest fixtures are needed to either
+mock the database endpoint or to spin up a real one.
+
+The pytest db fixtures are defined in [conftest.py](/tests/conftest.py).
+
+The current test code uses Docker to spin up the
+[maj1/test-mdb:neo4.4]((https://hub.docker.com/layers/maj1/test-mdb/neo4.4/images/sha256-777659d5d2a3dfb7c6828cde37af3e9845d29445656eeeb63a19ae5ae1ea2121))
+container as a fixture.  This takes some time when running tests. We
+can add other options (e.g., just provide a url to a db that is
+already up and running, a mock driver).
+
+Ideally, every endpoint defined in the routers with have a corresponding test. See
+[test\_id.py](/tests/test\_id.py) for an example.
+
+
+
+

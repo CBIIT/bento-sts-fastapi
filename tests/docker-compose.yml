@@ -1,6 +1,6 @@
 services:
   test-mdb:
-    image: 'maj1/test-mdb'
+    image: 'maj1/test-mdb:neo4.4'
     ports:
       - "7474"
       - "7687"
