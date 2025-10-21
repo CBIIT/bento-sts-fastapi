@@ -144,7 +144,7 @@ def all_pvs_get(request: Request):
     WITH cde, models, formatted_pvs,
       CASE WHEN size(null_pvs) > 0 THEN formatted_pvs + null_pvs ELSE formatted_pvs END AS final_pvs
     RETURN cde.origin_id AS CDECode, cde.origin_version AS CDEVersion,
-      cde.value AS CDEFullName, models, final_pvs AS permissibleValues LIMIT 10"""
+      cde.value AS CDEFullName, models, final_pvs AS permissibleValues"""
 
     stmt = " ". join([stmt,
                       f"SKIP {request.state.skip} " if request.state.skip else "",
