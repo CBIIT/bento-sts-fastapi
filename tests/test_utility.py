@@ -1,7 +1,7 @@
 from functools import cmp_to_key
 import semver
 
-from src.bento_sts.utility import compare_versions_fallback
+from src.bento_sts.utility import compare_versions_fallback, extract_semver_base
 from src.bento_sts.pymodels import Model
 
 
@@ -32,6 +32,11 @@ def test_model_version_sorting():
             try:
                 return semver.compare(m.version, n.version)
             except ValueError:
+                m_base = extract_semver_base(m.version)
+                n_base = extract_semver_base(n.version)
+                res = semver.compare(m_base, n_base)
+                if res != 0:
+                    return res
                 return compare_versions_fallback(m.version, n.version)
         else:
             return -1 if m.name < n.name else 1
@@ -65,13 +70,20 @@ def test_model_versions_sorting():
     
     # Apply the same sorting logic from model_model_versions_get
     def version_compare(v1, v2):
-        return compare_versions_fallback(v1, v2)
+        try:
+            return semver.compare(v1, v2)
+        except ValueError:
+            v1_base = extract_semver_base(v1)
+            v2_base = extract_semver_base(v2)
+            res = semver.compare(v1_base, v2_base)
+            if res != 0:
+                return res
+            return compare_versions_fallback(v1, v2)
     
     sorted_versions = sorted(ret, key=cmp_to_key(version_compare))
     
-    # Expected sorted order - with corrected prerelease handling
-    # All prerelease versions come before release versions (semver standard)
-    expected = ['1.9.1', '2.0.0', '2.1.0-0338852', '2.1.0-04f69bd', '2.1.0-5942323',
+    # Expected sorted order - prerelease comes first, then release for same base
+    expected = ['1.9.1', '2.0.0', '2.1.0-0338852', '2.1.0-5942323', '2.1.0-04f69bd',
                 '2.1.0-9f42edc', '2.1.0', '3.1.0-03eca65', '3.1.0-bef4a77',
                 '3.1.0-c1af4db', '3.1.0-ce9d6d5', '3.1.0']
     
@@ -85,15 +97,22 @@ def test_model_versions_correct_sorting():
            '3.1.0-bef4a77', '3.1.0-c1af4db', '3.1.0-ce9d6d5']
     
     def version_compare(v1, v2):
-        return compare_versions_fallback(v1, v2)
+        try:
+            return semver.compare(v1, v2)
+        except ValueError:
+            v1_base = extract_semver_base(v1)
+            v2_base = extract_semver_base(v2)
+            res = semver.compare(v1_base, v2_base)
+            if res != 0:
+                return res
+            return compare_versions_fallback(v1, v2)
     
     sorted_versions = sorted(ret, key=cmp_to_key(version_compare))
     print(f"\nSorted result with fixed version_utils:")
     print(sorted_versions)
     
-    # Expected: all prerelease versions should come before release versions
-    # For same major.minor.patch, prerelease < release (semver standard)
-    expected = ['1.9.1', '2.0.0', '2.1.0-0338852', '2.1.0-04f69bd', '2.1.0-5942323',
+    # Expected: prerelease comes first, then release for same base version
+    expected = ['1.9.1', '2.0.0', '2.1.0-0338852', '2.1.0-5942323', '2.1.0-04f69bd',
                 '2.1.0-9f42edc', '2.1.0', '3.1.0-03eca65', '3.1.0-bef4a77', 
                 '3.1.0-c1af4db', '3.1.0-ce9d6d5', '3.1.0']
     

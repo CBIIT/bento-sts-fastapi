@@ -5,7 +5,7 @@ from functools import cmp_to_key
 from ..dependencies import paging_params
 from ..converters import neo_to_py
 from ..pymodels import Model
-from ..utility import compare_versions_fallback
+from ..utility import compare_versions_fallback, extract_semver_base
 
 router = APIRouter(
     prefix="/models",
@@ -25,6 +25,11 @@ def models_get(request: Request) -> List[Model]:
             try:
                 return semver.compare(m.version, n.version)
             except ValueError:
+                m_base = extract_semver_base(m.version)
+                n_base = extract_semver_base(n.version)
+                res = semver.compare(m_base, n_base)
+                if res != 0:
+                    return res
                 return compare_versions_fallback(m.version, n.version)
         else:
             return -1 if m.name < n.name else 1
