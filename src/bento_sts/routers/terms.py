@@ -114,18 +114,35 @@ def all_pvs_get(request: Request):
       WHERE p.model IS NOT NULL AND p.version IS NOT NULL
     OPTIONAL MATCH (p)-[:has_tag]->(use_null_tag:tag {key: "useNullCDE"})
     WITH cde,
-      collect(DISTINCT {model: p.model, version: p.version, property: ent.handle + "." + p.handle, useNullCDE: coalesce(use_null_tag.value, "No")}) AS models,
-      ANY(ut IN collect(use_null_tag) WHERE ut.value = "Yes") AS should_use_null_cde
-    WITH cde, models, should_use_null_cde, cde.origin_id + "|" + coalesce(cde.origin_version, "") AS cde_hdl
+      COLLECT(DISTINCT {
+        model: p.model, 
+        version: p.version, 
+        property: ent.handle + "." + p.handle, 
+        useNullCDE: COALESCE(use_null_tag.value, "No")
+      }) AS models,
+      ANY(ut IN COLLECT(use_null_tag) WHERE ut.value IN ["Yes", "True"] OR ut.value = true) AS should_use_null_cde
+    WITH cde, models, should_use_null_cde, 
+      cde.origin_id + "|" + COALESCE(cde.origin_version, "") AS cde_hdl
+    // Get model pvs
     OPTIONAL MATCH (prop:property)-[:has_concept]->(c:concept)<-[:represents]-(cde)
     OPTIONAL MATCH (prop)-[:has_value_set]->(:value_set)-[:has_term]->(model_pv:term)
-    WITH cde, models, should_use_null_cde, cde_hdl, collect(DISTINCT model_pv) AS model_pvs
+    WITH cde, models, cde_hdl, collect(DISTINCT model_pv) AS model_pvs, should_use_null_cde
     OPTIONAL MATCH (vs:value_set {handle: cde_hdl})-[:has_term]->(cde_pv:term)
-    WITH cde, models, should_use_null_cde, model_pvs, collect(DISTINCT cde_pv) AS cde_pvs
-    OPTIONAL MATCH (null_vs:value_set {handle: "16476366|1"})-[:has_term]->(null_pv:term)
-      WHERE should_use_null_cde
-    WITH cde, models, model_pvs, cde_pvs, collect(DISTINCT null_pv) AS null_pvs,
-      CASE WHEN size(cde_pvs) > 0 AND NONE(p in cde_pvs WHERE p.value =~ "https?://.*") THEN cde_pvs WHEN size(cde_pvs) > 0 AND ANY(p in cde_pvs WHERE p.value =~ "https?://.*") AND size(model_pvs) > 0 THEN model_pvs ELSE [null] END AS pvs
+    WITH cde, models, should_use_null_cde, model_pvs, COLLECT(DISTINCT cde_pv) AS cde_pvs
+    // Get null CDE pvs if needed
+    OPTIONAL MATCH (null_vs:value_set {handle: '16476366|1'})-[:has_term]->(null_pv:term)
+    WITH cde, models, model_pvs, cde_pvs, 
+      CASE WHEN should_use_null_cde THEN COLLECT(DISTINCT null_pv) ELSE [] END AS null_pvs
+    WITH cde, models,
+      CASE
+        WHEN SIZE(cde_pvs) > 0 AND NONE(p IN cde_pvs WHERE p.value =~ "https?://.*") 
+          THEN cde_pvs + null_pvs
+        WHEN SIZE(cde_pvs) > 0 AND ANY(p IN cde_pvs WHERE p.value =~ "https?://.*") AND SIZE(model_pvs) > 0 
+          THEN model_pvs + null_pvs
+        WHEN SIZE(null_pvs) > 0
+          THEN null_pvs
+        ELSE [null]
+      END AS pvs
     WHERE size(pvs) > 0
     UNWIND pvs AS pv
     OPTIONAL MATCH (pv)-[:represents]->(c_cadsr:concept)<-[:represents]-(ncit_term:term {origin_name: "NCIt"}), (c_cadsr)-[:has_tag]->(:tag {key: "mapping_source", value: "caDSR"})
@@ -133,18 +150,13 @@ def all_pvs_get(request: Request):
       WHERE pv IS NOT NULL AND pv <> syn AND pv.value <> syn.value
     WITH cde, pv, models, pv.value as pv_val, ncit_term.origin_id AS ncit_oid,
       ncit_term.value AS ncit_value,
-      collect(DISTINCT syn.value) AS distinct_syn_vals,
-      null_pvs
-    WITH cde, models, pv_val, ncit_oid,
-      CASE WHEN ncit_value IS NOT NULL THEN distinct_syn_vals + [ncit_value] ELSE distinct_syn_vals END AS syn_vals,
-      null_pvs
+      collect(DISTINCT syn.value) AS distinct_syn_vals WITH cde, models, pv_val,
+      ncit_oid,
+      CASE WHEN ncit_value IS NOT NULL THEN distinct_syn_vals + [ncit_value] ELSE distinct_syn_vals END AS syn_vals
     WITH cde, models,
-      CASE WHEN pv_val IS NOT NULL THEN collect({value: pv_val, synonyms: syn_vals, ncit_concept_code: ncit_oid}) ELSE [] END AS formatted_pvs,
-      null_pvs
-    WITH cde, models, formatted_pvs,
-      CASE WHEN size(null_pvs) > 0 THEN formatted_pvs + null_pvs ELSE formatted_pvs END AS final_pvs
+      CASE WHEN pv_val IS NOT NULL THEN collect({value: pv_val, synonyms: syn_vals, ncit_concept_code: ncit_oid}) ELSE [] END AS formatted_pvs
     RETURN cde.origin_id AS CDECode, cde.origin_version AS CDEVersion,
-      cde.value AS CDEFullName, models, final_pvs AS permissibleValues"""
+      cde.value AS CDEFullName, models, formatted_pvs AS permissibleValues"""
 
     stmt = " ". join([stmt,
                       f"SKIP {request.state.skip} " if request.state.skip else "",
