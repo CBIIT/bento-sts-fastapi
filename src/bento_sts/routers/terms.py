@@ -58,7 +58,7 @@ def pvs_synonyms_model_version_get(request: Request, model: str, version: str):
         THEN distinct_syn_vals + [ncit_value]
         ELSE distinct_syn_vals END AS syn_vals
     WITH prop, CDECode, CDEVersion, CDEFullName, model_pvs,
-    collect({value: pv_val, synonyms: syn_vals, ncit_concept_code: ncit_oid}) AS formatted_pvs
+      CASE WHEN pv_val IS NOT NULL THEN collect({value: pv_val, synonyms: syn_vals, ncit_concept_code: ncit_oid}) ELSE [] END AS formatted_pvs
     RETURN $p0 AS dataCommons, $p1 AS version,
       prop AS property, CDECode, CDEVersion, CDEFullName,
       formatted_pvs AS permissibleValues
