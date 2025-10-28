@@ -174,7 +174,7 @@ def all_pvs_get(request: Request):
     WITH cde, models,
       CASE WHEN pv_val IS NOT NULL THEN collect({value: pv_val, synonyms: syn_vals, ncit_concept_code: ncit_oid}) ELSE [] END AS formatted_pvs
     RETURN cde.origin_id AS CDECode, cde.origin_version AS CDEVersion,
-      cde.value AS CDEFullName, models, formatted_pvs AS permissibleValues LIMIT 30"""
+      cde.value AS CDEFullName, models, formatted_pvs AS permissibleValues"""
 
     stmt = " ". join([stmt,
                       f"SKIP {request.state.skip} " if request.state.skip else "",
