@@ -117,7 +117,7 @@ def cde_pvs_by_id_with_version_get(request: Request, id: str, version: str):
 def all_pvs_get(request: Request):
     stmt = """
     MATCH (cde:term)
-      WHERE toLower(cde.origin_name) CONTAINS "cadsr" and cde.origin_id='14596139'
+      WHERE toLower(cde.origin_name) CONTAINS "cadsr"
     WITH cde
     MATCH (ent)-[:has_property]->(p:property)-[:has_concept]->(:concept)<-[:represents]-(cde)
       WHERE p.model IS NOT NULL AND p.version IS NOT NULL
