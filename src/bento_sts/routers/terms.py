@@ -65,38 +65,77 @@ def pvs_synonyms_model_version_get(request: Request, model: str, version: str):
     
 
 @router.get(
-    "/cde-pvs/{id}/{version}/pvs",
-    summary="Get PVs for a given CDE id and version."
+    "/cde-pvs/{prop}/pvs",
+    summary="Get PVs for a given handle property."
 )
-def cde_pvs_by_id_with_version_get(request: Request, id: str, version: str):
+def cde_pvs_by_property_get(request: Request, prop: str):
     stmt = """
-    MATCH (n0:term {origin_id: $p0 })
-      WHERE $p1 = "none" OR n0.origin_version = $p1
-    OPTIONAL MATCH (vs:value_set)-[:has_term]->(pv:term)
-      WHERE vs.handle = $p0 + '|' + coalesce(n0.origin_version, "")
-    WITH n0, vs.url as value_set_url, COLLECT(pv) as pvs WITH n0,
-      value_set_url, pvs,
-      CASE WHEN size(pvs) > 0 THEN pvs ELSE [null] END as pvs_to_process
-    UNWIND pvs_to_process AS pv
-    OPTIONAL MATCH (pv)-[:represents]->(c_cadsr:concept)<-[:represents]-(ncit_term:term {origin_name: "NCIt"}), (c_cadsr)-[:has_tag]->(:tag {key: "mapping_source", value: "caDSR"})
-      WHERE pv IS NOT NULL
-    OPTIONAL MATCH (ncit_term)-[:represents]->(c_ncim:concept)<-[:represents]-(syn:term), (c_ncim)-[:has_tag]->(:tag {key: "mapping_source", value: "NCIm"})
-      WHERE pv IS NOT NULL AND pv <> syn and pv.value <> syn.value
-    WITH n0, value_set_url, pvs,
-      CASE WHEN pv IS NULL THEN null ELSE pv.value END as pv_val,
-      CASE WHEN pv IS NULL THEN null ELSE ncit_term.origin_id END AS ncit_oid,
-      CASE WHEN pv IS NULL THEN null ELSE ncit_term.value END AS ncit_value,
-      collect(DISTINCT syn.value) AS distinct_syn_vals
-    WITH n0, value_set_url, pvs,
-      CASE WHEN pv_val IS NULL THEN [] ELSE collect({value: pv_val, synonyms: CASE WHEN ncit_value IS NOT NULL THEN distinct_syn_vals + [ncit_value] ELSE distinct_syn_vals END, ncit_concept_code: ncit_oid}) END AS permissibleValues
-    RETURN n0.origin_id AS CDECode, n0.origin_version AS CDEVersion,
-      n0.value AS CDEFullName, permissibleValues"""
+    MATCH (p:property {handle: $p0})
+    WITH p
+    OPTIONAL MATCH (p)-[:has_concept]->(:concept)<-[:represents]-(cde:term)
+      WHERE toLower(cde.origin_name) CONTAINS 'cadsr'
+    OPTIONAL MATCH (p)-[:has_tag]->(use_null_tag:tag {key: "useNullCDE"})
+    WITH DISTINCT p, cde,
+      cde.origin_id + "|" + COALESCE(cde.origin_version, "") AS cde_hdl,
+      CASE WHEN cde IS NOT NULL THEN true ELSE false END AS has_cde,
+      ANY(ut IN COLLECT(use_null_tag) WHERE ut.value IN ["Yes", "True"] OR ut.value = true) AS should_use_null_cde
+    WHERE cde IS NOT NULL
+    OPTIONAL MATCH (n0:node)-[:has_property]->(p)
+    WITH p, cde, cde_hdl, has_cde, should_use_null_cde,
+      COLLECT(DISTINCT {model: n0.model, version: n0.version}) AS model_versions
+    WHERE SIZE(model_versions) > 0
+    UNWIND model_versions AS mv
+    OPTIONAL MATCH (p)-[:has_value_set]->(:value_set)-[:has_term]->(model_pv:term)
+    WITH p, cde, cde_hdl, has_cde, should_use_null_cde, mv,
+      COLLECT(DISTINCT model_pv) AS model_pvs
+    OPTIONAL MATCH (v:value_set {handle: cde_hdl})-[:has_term]->(cde_pv:term)
+    WITH p, cde, has_cde, should_use_null_cde, mv, model_pvs,
+      [pv IN COLLECT(DISTINCT cde_pv) WHERE pv IS NOT NULL] AS cde_pvs
+    OPTIONAL MATCH (null_vs:value_set {handle: '16476366|1'})-[:has_term]->(null_pv:term)
+    WITH p, cde, has_cde, should_use_null_cde, mv, model_pvs, cde_pvs,
+      CASE WHEN should_use_null_cde THEN COLLECT(DISTINCT null_pv) ELSE [] END AS null_pvs
+    WITH p, cde, has_cde, should_use_null_cde, mv, model_pvs, cde_pvs, null_pvs,
+      CASE 
+        WHEN has_cde AND SIZE(cde_pvs) > 0 AND NONE(pv in cde_pvs WHERE pv.value =~ 'https?://.*')
+          THEN cde_pvs + null_pvs
+        WHEN has_cde AND SIZE(cde_pvs) > 0 AND ANY(pv in cde_pvs WHERE pv.value =~ 'https?://.*') AND SIZE(model_pvs) > 0
+          THEN model_pvs + null_pvs
+        WHEN NOT has_cde AND SIZE(model_pvs) > 0
+          THEN model_pvs + null_pvs
+        WHEN SIZE(null_pvs) > 0
+          THEN null_pvs
+        ELSE [null]
+      END AS pvs
+    WHERE SIZE(pvs) > 0
+    UNWIND pvs AS pv
+    OPTIONAL MATCH (pv)-[:represents]->(c_cadsr:concept)<-[:represents]-(ncit_term:term {origin_name: 'NCIt'}),
+      (c_cadsr)-[:has_tag]->(:tag {key: "mapping_source", value: "caDSR"})
+    OPTIONAL MATCH (ncit_term)-[:represents]->(c_ncim:concept)<-[:represents]-(syn:term),
+      (c_ncim)-[:has_tag]->(:tag {key: "mapping_source", value: "NCIm"})
+    WHERE pv IS NOT NULL AND (syn IS NULL OR (pv <> syn AND pv.value <> syn.value))
+    WITH cde, p, mv, pv, pv.value as pv_val, 
+      ncit_term.origin_id AS ncit_oid,
+      ncit_term.value AS ncit_value,
+      COLLECT(DISTINCT syn.value) AS distinct_syn_vals
+    WITH cde, p, mv, pv_val, ncit_oid,
+      CASE WHEN ncit_value IS NOT NULL THEN distinct_syn_vals + [ncit_value] ELSE distinct_syn_vals END AS syn_vals
+    WITH cde, p, mv,
+        CASE WHEN pv_val IS NOT NULL THEN COLLECT(DISTINCT {value: pv_val, synonyms: syn_vals, ncit_concept_code: ncit_oid}) ELSE [] END AS formatted_pvs
+    RETURN DISTINCT
+      cde.origin_id AS CDECode,
+      cde.origin_version AS CDEVersion,
+      cde.value AS CDEFullName,
+      mv.model AS dataCommons,
+      mv.version AS version,
+      formatted_pvs AS permissibleValues,
+      p.handle AS property
+    """
     stmt = " ".join([stmt,
                      f"SKIP {request.state.skip} " if request.state.skip else "",
                      f"LIMIT {request.state.limit}" if request.state.limit else ""])
     ret = request.state.mdb.get_with_statement(
         stmt,
-        {"p0": id, "p1": version}
+        {"p0": prop}
     )
     return ret
     
@@ -135,7 +174,7 @@ def all_pvs_get(request: Request):
     WITH cde, models,
       CASE WHEN pv_val IS NOT NULL THEN collect({value: pv_val, synonyms: syn_vals, ncit_concept_code: ncit_oid}) ELSE [] END AS formatted_pvs
     RETURN cde.origin_id AS CDECode, cde.origin_version AS CDEVersion,
-      cde.value AS CDEFullName, models, formatted_pvs AS permissibleValues"""
+      cde.value AS CDEFullName, models, formatted_pvs AS permissibleValues LIMIT 30"""
 
     stmt = " ". join([stmt,
                       f"SKIP {request.state.skip} " if request.state.skip else "",
