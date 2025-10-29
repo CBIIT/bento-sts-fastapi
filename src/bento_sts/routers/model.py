@@ -5,7 +5,7 @@ from typing import List
 from ..dependencies import paging_params
 from ..converters import neo_to_py
 from ..pymodels import Model, Node, Property, Term
-from ..utility import compare_versions_fallback, extract_semver_base
+from ..utility.version_utils import model_version_compare
 
 router = APIRouter(
     prefix="/model",
@@ -33,17 +33,7 @@ def model_model_versions_get(
     for row in rows:
         ret.append(row['version'])
     
-    def version_compare(v1, v2):
-        try:
-            return semver.compare(v1, v2)
-        except ValueError:
-            v1_base = extract_semver_base(v1)
-            v2_base = extract_semver_base(v2)
-            res = semver.compare(v1_base, v2_base)
-            if res != 0:
-                return res
-            return compare_versions_fallback(v1, v2)
-    return sorted(ret, key=cmp_to_key(version_compare))
+    return sorted(ret, key=cmp_to_key(model_version_compare))
 
 
 @router.get(

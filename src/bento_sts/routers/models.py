@@ -5,7 +5,7 @@ from functools import cmp_to_key
 from ..dependencies import paging_params
 from ..converters import neo_to_py
 from ..pymodels import Model
-from ..utility import compare_versions_fallback, extract_semver_base
+from ..utility.version_utils import model_version_compare
 
 router = APIRouter(
     prefix="/models",
@@ -20,20 +20,6 @@ router = APIRouter(
     dependencies=[Depends(paging_params)],
 )
 def models_get(request: Request) -> List[Model]:
-    def cmp_model(m: Model, n: Model):
-        if (m.name == n.name):
-            try:
-                return semver.compare(m.version, n.version)
-            except ValueError:
-                m_base = extract_semver_base(m.version)
-                n_base = extract_semver_base(n.version)
-                res = semver.compare(m_base, n_base)
-                if res != 0:
-                    return res
-                return compare_versions_fallback(m.version, n.version)
-        else:
-            return -1 if m.name < n.name else 1
-
     stmt = " ".join(
         ['MATCH (n0:model) RETURN n0 as model',
          f"SKIP {request.state.skip} " if request.state.skip else "",
@@ -45,7 +31,7 @@ def models_get(request: Request) -> List[Model]:
     )
     for row in rows:
         ret.append(neo_to_py(row['model']))
-    return sorted(ret, key=cmp_to_key(cmp_model))
+    return sorted(ret, key=cmp_to_key(model_version_compare))
 
 
 @router.get(
