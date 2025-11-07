@@ -1,11 +1,39 @@
-from bento_sts.utility.version_utils import model_version_compare
+from bento_sts.utility.version_utils import model_version_compare, version_string_compare
 from bento_sts.pymodels import Model
 from functools import cmp_to_key
 
 class MockModel(Model):
     is_latest_version: bool | None = None
     
-    
+def test_version_string_compare_sorting():
+    """Test sorting version strings using version_string_compare"""
+    versions = [
+        "1.6.0-9351eb2",
+        "1.6.0",
+        "1.6.0-04f69bd",
+        "1.5.0",
+        "1.9",
+        "1.10.9",
+        "1.10.10",
+        "2.0",
+        "1.6.0-0942323",
+    ]
+
+    expected = [
+        "1.5.0",
+        "1.6.0-04f69bd",
+        "1.6.0-0942323",
+        "1.6.0-9351eb2",
+        "1.6.0",
+        "1.9",
+        "1.10.9",
+        "1.10.10",
+        "2.0"
+    ]
+
+    sorted_versions = sorted(versions, key=cmp_to_key(version_string_compare))
+    assert sorted_versions == expected
+
 def test_model_version_sorting():
     models = [
         MockModel(name="C3DC", version="10.0.1-9351eb2"),

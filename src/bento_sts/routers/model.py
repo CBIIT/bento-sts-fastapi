@@ -1,11 +1,10 @@
-import semver
 from functools import cmp_to_key
 from fastapi import APIRouter, Depends, Request
 from typing import List
 from ..dependencies import paging_params
 from ..converters import neo_to_py
 from ..pymodels import Model, Node, Property, Term
-from ..utility.version_utils import model_version_compare
+from ..utility.version_utils import version_string_compare
 
 router = APIRouter(
     prefix="/model",
@@ -33,7 +32,7 @@ def model_model_versions_get(
     for row in rows:
         ret.append(row['version'])
     
-    return sorted(ret, key=cmp_to_key(model_version_compare))
+    return sorted(ret, key=cmp_to_key(version_string_compare))
 
 
 @router.get(

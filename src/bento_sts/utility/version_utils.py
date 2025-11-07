@@ -71,3 +71,14 @@ def model_version_compare(m1, m2):
             return compare_versions_fallback(v1, v2)
     else:
         return -1 if m1.name < m2.name else 1
+
+def version_string_compare(v1, v2):
+    try:
+        return semver.compare(v1, v2)
+    except ValueError:
+        v1_base = extract_semver_base(v1)
+        v2_base = extract_semver_base(v2)
+        res = semver.compare(v1_base, v2_base)
+        if res != 0:
+            return res
+        return compare_versions_fallback(v1, v2)
