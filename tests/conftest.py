@@ -31,6 +31,9 @@ def test_mdb(docker_services, docker_ip):
     )
     return (bolt_url, http_url)
 
+@pytest.fixture(scope="session")
+def test_mdb_7687():
+    return ("bolt://localhost:7687", "http://localhost:7474")
 
 @pytest.fixture(scope="session")
 def test_sts_client(test_mdb):
