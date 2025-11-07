@@ -29,3 +29,8 @@ dev = [
     "rope>=1.14.0",
     "yapf>=0.43.0",
 ]
+
+[tool.pytest.ini_options]
+addopts = "-s"
+
+        

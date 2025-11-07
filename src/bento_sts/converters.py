@@ -6,7 +6,7 @@ from .pymodels import (
     Relationship, Concept, ValueSet,
     Term, Tag, CDE,
 )
-
+from pdb import set_trace
 logger = getLogger()
 
 
@@ -29,11 +29,12 @@ def neo_to_py(neo_node: neoNode) -> BaseModel:
     elif 'term' in neo_node.labels:
         returnCls = Term
     else:
-        logger.warning(
+        logger.error(
             f"Neo4j node with labels {neo_node.labels} cannot be converted "
             "to a current Pydantic model")
         return
-    return returnCls(**dict(neo_node.items()))
+    if (returnCls is not None):
+        return returnCls(**dict(neo_node.items()))
 
 
 def neo_to_cde(neo_node: neoNode):

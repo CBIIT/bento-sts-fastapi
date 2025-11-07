@@ -36,8 +36,8 @@ def test_persistent_mdb():
     return (PERSISTENT_MDB_BOLT_URL, None)
 
 @pytest.fixture(scope="session")
-def test_sts_client(test_persistent_mdb):
-    os.putenv('NEO4J_MDB_URI',test_persistent_mdb[0])
+def test_sts_client(test_mdb):
+    os.putenv('NEO4J_MDB_URI',test_mdb[0])
     os.putenv('NEO4J_MDB_USER','neo4j1')
     os.putenv('NEO4J_MDB_PASS','neo4j')
     return TestClient(app)

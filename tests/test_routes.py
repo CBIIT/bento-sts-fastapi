@@ -1,7 +1,6 @@
 # tests/test_routes.py
 import pytest
 
-
 class TestTagsRouter:
     """Tests for /tags endpoints"""
     
@@ -36,8 +35,8 @@ class TestTagRouter:
     
     def test_tag_key_values_get_invalid(self, test_sts_client):
         response = test_sts_client.get("/v2/tag/nonexistent_key/values")
-        assert response.status_code == 200
-        assert response.json() == []
+        assert response.status_code == 404
+        assert response.json()['detail'] == "No records found."
     
     def test_tag_key_value_entities_get(self, test_sts_client):
         # Get a tag first
@@ -103,8 +102,8 @@ class TestModelRouter:
     
     def test_model_versions_get_invalid(self, test_sts_client):
         response = test_sts_client.get("/v2/model/nonexistent_model/versions")
-        assert response.status_code == 200
-        assert response.json() == []
+        assert response.status_code == 404
+        assert response.json()['detail'] == "No records found."
     
     def test_model_latest_version_get(self, test_sts_client, model_info):
         if model_info:
@@ -189,41 +188,23 @@ class TestModelRouter:
                     assert response.status_code == 200
                     assert response.json()["handle"] == prop["handle"]
     
-    def test_model_node_property_terms_get(self, test_sts_client, model_info):
-        if model_info:
-            nodes_response = test_sts_client.get(
-                f"/v2/model/{model_info['name']}/version/{model_info['version']}/nodes?limit=1"
-            )
-            if nodes_response.json():
-                node = nodes_response.json()[0]
-                props_response = test_sts_client.get(
-                    f"/v2/model/{model_info['name']}/version/{model_info['version']}/node/{node['handle']}/properties?limit=1"
-                )
-                if props_response.json():
-                    prop = props_response.json()[0]
-                    response = test_sts_client.get(
-                        f"/v2/model/{model_info['name']}/version/{model_info['version']}/node/{node['handle']}/property/{prop['handle']}/terms"
-                    )
-                    assert response.status_code == 200
-                    assert isinstance(response.json(), list)
-    
+    def test_model_node_property_terms_get(self, test_sts_client):
+        # test a property that has terms and one that doesn't
+        response = test_sts_client.get("/v2/model/CTDC/version/1.7.0/node/principal_investigator"
+                                       "/property/person_orcid/terms")
+        assert response.status_code == 404
+        assert response.json()['detail'] == "No records found."
+
+        response = test_sts_client.get("/v2/model/CTDC/version/1.7.0/node/diagnosis"
+                                       "/property/meddra_disease_code/terms")
+        assert response.status_code == 200
+        assert isinstance(response.json(), list)
+        
     def test_model_node_property_terms_count_get(self, test_sts_client, model_info):
-        if model_info:
-            nodes_response = test_sts_client.get(
-                f"/v2/model/{model_info['name']}/version/{model_info['version']}/nodes?limit=1"
-            )
-            if nodes_response.json():
-                node = nodes_response.json()[0]
-                props_response = test_sts_client.get(
-                    f"/v2/model/{model_info['name']}/version/{model_info['version']}/node/{node['handle']}/properties?limit=1"
-                )
-                if props_response.json():
-                    prop = props_response.json()[0]
-                    response = test_sts_client.get(
-                        f"/v2/model/{model_info['name']}/version/{model_info['version']}/node/{node['handle']}/property/{prop['handle']}/terms/count"
-                    )
-                    assert response.status_code == 200
-                    assert isinstance(response.json(), int)
+        response = test_sts_client.get("/v2/model/CTDC/version/1.7.0/node/diagnosis"
+                                       "/property/meddra_disease_code/terms/count")
+        assert response.status_code == 200
+        assert isinstance(response.json(), int)
 
 
 class TestIdRouter:
@@ -236,6 +217,7 @@ class TestIdRouter:
     def test_id_get_invalid(self, test_sts_client):
         response = test_sts_client.get("/v2/id/i17Aa")
         assert response.status_code == 404
+        assert response.json()['detail'] == 'No records found.';
 
 
 class TestTermsRouter:
@@ -270,19 +252,19 @@ class TestTermsRouter:
         response = test_sts_client.get(
             "/v2/terms/model-pvs/nonexistent_model/1.0.0/pvs"
         )
-        assert response.status_code == 200
-        assert response.json() == []
+        assert response.status_code == 404
+        assert response.json()['detail'] == "No records found."
     
     def test_cde_pvs_by_id_with_version_get(self, test_sts_client):
         # Test with a specific CDE ID if you know one exists
-        response = test_sts_client.get("/v2/terms/cde-pvs/test_id/1.0/pvs")
+        response = test_sts_client.get("/v2/terms/cde-pvs/4723846/1/pvs")
         assert response.status_code == 200
         assert isinstance(response.json(), list)
     
     def test_cde_pvs_by_id_without_version_get(self, test_sts_client):
         response = test_sts_client.get("/v2/terms/cde-pvs/test_id/none/pvs")
-        assert response.status_code == 200
-        assert isinstance(response.json(), list)
+        assert response.status_code == 404
+        assert response.json()['detail'] == "No records found."
     
     def test_all_pvs_get(self, test_sts_client):
         response = test_sts_client.get("/v2/terms/all-pvs")
