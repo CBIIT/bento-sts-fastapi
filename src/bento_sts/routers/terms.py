@@ -65,6 +65,43 @@ def pvs_synonyms_model_version_get(request: Request, model: str, version: str):
     
 
 @router.get(
+    "/cde-pvs/{id}/{version}/pvs",
+    summary="Get PVs for a given CDE id and version."
+)
+def cde_pvs_by_id_with_version_get(request: Request, id: str, version: str):
+    stmt = """
+    MATCH (n0:term {origin_id: $p0 })
+      WHERE $p1 = "none" OR n0.origin_version = $p1
+    OPTIONAL MATCH (vs:value_set)-[:has_term]->(pv:term)
+      WHERE vs.handle = $p0 + '|' + coalesce(n0.origin_version, "")
+    WITH n0, vs.url as value_set_url, COLLECT(pv) as pvs WITH n0,
+      value_set_url, pvs,
+      CASE WHEN size(pvs) > 0 THEN pvs ELSE [null] END as pvs_to_process
+    UNWIND pvs_to_process AS pv
+    OPTIONAL MATCH (pv)-[:represents]->(c_cadsr:concept)<-[:represents]-(ncit_term:term {origin_name: "NCIt"}), (c_cadsr)-[:has_tag]->(:tag {key: "mapping_source", value: "caDSR"})
+      WHERE pv IS NOT NULL
+    OPTIONAL MATCH (ncit_term)-[:represents]->(c_ncim:concept)<-[:represents]-(syn:term), (c_ncim)-[:has_tag]->(:tag {key: "mapping_source", value: "NCIm"})
+      WHERE pv IS NOT NULL AND pv <> syn and pv.value <> syn.value
+    WITH n0, value_set_url, pvs,
+      CASE WHEN pv IS NULL THEN null ELSE pv.value END as pv_val,
+      CASE WHEN pv IS NULL THEN null ELSE ncit_term.origin_id END AS ncit_oid,
+      CASE WHEN pv IS NULL THEN null ELSE ncit_term.value END AS ncit_value,
+      collect(DISTINCT syn.value) AS distinct_syn_vals
+    WITH n0, value_set_url, pvs,
+      CASE WHEN pv_val IS NULL THEN [] ELSE collect({value: pv_val, synonyms: CASE WHEN ncit_value IS NOT NULL THEN distinct_syn_vals + [ncit_value] ELSE distinct_syn_vals END, ncit_concept_code: ncit_oid}) END AS permissibleValues
+    RETURN n0.origin_id AS CDECode, n0.origin_version AS CDEVersion,
+      n0.value AS CDEFullName, permissibleValues"""
+    stmt = " ".join([stmt,
+                     f"SKIP {request.state.skip} " if request.state.skip else "",
+                     f"LIMIT {request.state.limit}" if request.state.limit else ""])
+    ret = request.state.mdb.get_with_statement(
+        stmt,
+        {"p0": id, "p1": version}
+    )
+    return ret
+
+
+@router.get(
     "/cde-pvs/{prop}/pvs",
     summary="Get PVs for a given handle property."
 )
@@ -138,7 +175,7 @@ def cde_pvs_by_property_get(request: Request, prop: str):
         {"p0": prop}
     )
     return ret
-    
+
 
 @router.get(
     "/all-pvs",
