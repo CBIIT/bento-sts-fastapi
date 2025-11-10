@@ -283,8 +283,7 @@ class TestEdgeCases:
     
     def test_invalid_pagination_params(self, test_sts_client):
         response = test_sts_client.get("/v2/tags?skip=-1&limit=-5")
-        # Should still return 200, but handle gracefully
-        assert response.status_code in [200, 400, 422]
+        assert response.status_code == 422
     
     def test_very_large_limit(self, test_sts_client):
         response = test_sts_client.get("/v2/tags?limit=1000000")

@@ -10,7 +10,10 @@ from ..utility.version_utils import model_version_compare
 router = APIRouter(
     prefix="/models",
     tags=["models"],
-    responses={404: {"description": "Not found."}},
+    responses={
+        404: {"description": "Not found."},
+        422: {"description": "Bad parameters (skip or limit?)"},
+    },
     )
 
 

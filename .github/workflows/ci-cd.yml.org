@@ -1,0 +1,37 @@
+name: ci-cd
+
+on: [push, pull_request]
+
+jobs:
+    test-build:
+      uses: CBIIT/bento-workflows/.github/workflows/test-build.yml@v3.0.13
+      with:
+        workdir: .
+        versions: |
+          ["3.10","3.11","3.12","3.13"]
+
+    test-publish:
+      needs: test-build
+      permissions:
+        id-token: write
+      runs-on: ubuntu-latest
+
+      steps:
+        - name: Download build artifact
+          uses: actions/download-artifact@v5
+          with:
+            artifact-ids: ${{ needs.test-build.outputs.build-artifact-id }}
+
+        - name: Publish package to testpypi
+          uses: pypa/gh-action-pypi-publish@v1.13.0
+          with:
+            user: __token__
+            repository-url: https://test.pypi.org
+            packages-dir: ./dist
+            verbose: true
+
+        - name: Test install from testpypi
+          run: |
+            pip install --index-url https://test.pypi.org/simple/ \
+                        --extra-index-url https://test.pypi.org/simple \
+                        bento-sts-fastapi

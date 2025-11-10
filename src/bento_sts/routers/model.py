@@ -1,4 +1,3 @@
-import semver
 from functools import cmp_to_key
 from fastapi import APIRouter, Depends, Request
 from typing import List
@@ -10,7 +9,10 @@ from ..utility.version_utils import model_version_compare
 router = APIRouter(
     prefix="/model",
     tags=["model"],
-    responses={404: {"description": "Not found."}},
+    responses={
+        404: {"description": "Not found."},
+        422: {"description": "Bad parameters (skip or limit?)"},
+    },
     )
 
 
@@ -92,7 +94,6 @@ def model_model_handle_nodes_count_get(request: Request, modelHandle: str, versi
 )
 def model_model_handle_node_node_handle_get(request: Request, modelHandle: str, versionString: str, nodeHandle: str) -> Node:
     stmt = 'MATCH (n0:node {model:$p0,version:$p1,handle:$p2}) RETURN n0 as node'
-    ret = []
     rows = request.state.mdb.get_with_statement(
         stmt,
         {"p0": modelHandle, "p1": versionString, "p2": nodeHandle}
@@ -113,7 +114,7 @@ def model_model_handle_node_node_handle_properties_get(
         'MATCH (n0:node {model:$p0,version:$p1,handle:$p2})-[r0:has_property]->(n1:property) RETURN n1 as prop',
         f"SKIP {request.state.skip} " if request.state.skip else "",
         f"LIMIT {request.state.limit}" if request.state.limit else ""])
-    ret=[]
+    ret = []
     rows = request.state.mdb.get_with_statement(
         stmt,
         {"p0": modelHandle, "p1": versionString, "p2": nodeHandle}

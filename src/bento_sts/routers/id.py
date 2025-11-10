@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, Request
-from bento_sts.converters import neo_to_py
-from bento_sts.pymodels import Entity, Term
+from ..converters import neo_to_py
+from ..pymodels import Entity, Term
 
 router = APIRouter(
     prefix="/id",
