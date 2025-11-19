@@ -1,8 +1,8 @@
 import pytest
 import requests
-import os
 from fastapi.testclient import TestClient
 from bento_sts.sts import app
+from bento_sts import dependencies
 from bento_sts.mdb import MDBReader
 from requests.exceptions import ConnectionError
 
@@ -41,9 +41,9 @@ def test_mdb(request):
 
 @pytest.fixture(scope="session")
 def test_sts_client(test_mdb):
-    os.environ['NEO4J_MDB_URI'] = test_mdb[0]
-    os.environ['NEO4J_MDB_USER'] = 'neo4j1'
-    os.environ['NEO4J_MDB_PASS'] = 'neo4j'
+    dependencies.mdb = MDBReader(uri=test_mdb[0],
+                                 user='neo4j1',
+                                 password='neo4j')
     return TestClient(app)
 
 
@@ -56,11 +56,6 @@ def test_sts_mdb(test_mdb):
         yield rdr
     finally:
         rdr.close()
-
-# @pytest.fixture(scope="session")
-# def docker_setup():
-#     return ["up -d --wait"]
-
 
 @pytest.fixture(scope="session")
 def docker_compose_project_name():

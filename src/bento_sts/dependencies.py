@@ -1,9 +1,9 @@
 from logging import getLogger
-from fastapi import Request, Query
+from fastapi import Request
 from pydantic import Field
 from typing import Annotated
 from .mdb import MDBReader
-from pdb import set_trace
+
 
 logger = getLogger()
 mdb = MDBReader()
