@@ -7,7 +7,10 @@ router = APIRouter(
     prefix="/terms",
     tags=["terms"],
     dependencies=[Depends(paging_params)],
-    responses={404: {"description": "Not found."}},
+    responses={
+        404: {"description": "Not found."},
+        422: {"description": "Bad parameters (skip or limit?)"},
+    },
     )
 
 @router.get(

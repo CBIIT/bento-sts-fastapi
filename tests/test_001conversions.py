@@ -1,4 +1,5 @@
 import pytest
+import os
 from bento_sts.converters import neo_to_py, neo_to_cde
 from bento_sts.pymodels import (
     Model, Node, Property,
