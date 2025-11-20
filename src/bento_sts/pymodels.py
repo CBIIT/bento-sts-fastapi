@@ -50,7 +50,7 @@ class Term(BaseModel):
 class Tag(BaseModel):
     type: Literal['Tag'] = 'Tag'
     key: str
-    value: str
+    value: str | bool
     nanoid: str
 
 

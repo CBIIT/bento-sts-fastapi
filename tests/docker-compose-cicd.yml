@@ -1,0 +1,16 @@
+services:
+  test-mdb:
+    image: 'maj1/test-mdb:neo4.4'
+    ports:
+      - "7474:7474"
+      - "7687:7687"
+    healthcheck:
+      test:
+        - "CMD"
+        - "wget"
+        - "http://localhost:7474"
+      interval: 15s
+      timeout: 30s
+      retries: 5
+      
+      
