@@ -14,7 +14,7 @@ class Entity(BaseModel):
 class Model(Entity):
     type: Literal['Model'] = 'Model'
     name: str | None = None
-    repo: Url | None = None
+    repository: Url | None = None
     is_latest_version: bool
     nanoid: str | None = None
 
