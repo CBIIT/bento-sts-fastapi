@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, Request
+from typing import List
 from ..dependencies import paging_params
-from ..pymodels import Term, CDE
+from ..pymodels import Term, CDE, CDEPermissibleValues, CDEPermissibleValuesWithModelInfo, CDEPermissibleValuesWithPropertyInfo
 from ..converters import neo_to_py, neo_to_cde
 
 router = APIRouter(
@@ -15,7 +16,8 @@ router = APIRouter(
 
 @router.get(
     "/model-pvs/{model}/{version}/pvs",
-    summary="Get Permissible Values and Synonyms for a specified model and version."
+    summary="Get Permissible Values and Synonyms for a specified model and version.",
+    response_model=List[CDEPermissibleValuesWithPropertyInfo],
 )
 def pvs_synonyms_model_version_get(request: Request, model: str, version: str):
     stmt = """
@@ -64,12 +66,13 @@ def pvs_synonyms_model_version_get(request: Request, model: str, version: str):
         stmt,
         {"p0": model, "p1": version}
     )
-    return ret
+    return [record.data() if hasattr(record, 'data') else dict(record.items()) for record in ret]
     
 
 @router.get(
     "/cde-pvs/{id}/{version}/pvs",
-    summary="Get PVs for a given CDE id and version."
+    summary="Get PVs for a given CDE id and version.",
+    response_model=List[CDEPermissibleValues],
 )
 def cde_pvs_by_id_with_version_get(request: Request, id: str, version: str):
     stmt = """
@@ -101,12 +104,13 @@ def cde_pvs_by_id_with_version_get(request: Request, id: str, version: str):
         stmt,
         {"p0": id, "p1": version}
     )
-    return ret
+    return [record.data() if hasattr(record, 'data') else dict(record.items()) for record in ret]
     
 
 @router.get(
     "/all-pvs",
-    summary="Get all PVs and synonyms for all models and CDEs"
+    summary="Get all PVs and synonyms for all models and CDEs",
+    response_model=List[CDEPermissibleValuesWithModelInfo],
 )
 def all_pvs_get(request: Request):
     stmt = """
@@ -147,4 +151,4 @@ def all_pvs_get(request: Request):
         stmt,
         {}
     )
-    return ret
+    return [record.data() if hasattr(record, 'data') else dict(record.items()) for record in ret]

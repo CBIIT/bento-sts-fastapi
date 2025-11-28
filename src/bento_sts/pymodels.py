@@ -30,7 +30,7 @@ class Property(Entity):
     is_key: bool | None = None
     is_strict: bool | None = None
     is_nullable: bool | None = None
-    is_required: bool | None = None
+    is_required: str | bool | None = None
     value_domain: str
     item_domain: str | None = None
     units: str | None = None
@@ -78,9 +78,47 @@ class CDE(BaseModel):
     CDEFullName: str
 
 
-class CDEWithPermissibleValues(CDE):
-    permissibleValues: List[str]
+class PermissibleValue(BaseModel):
+    """Permissible value with synonyms and NCIt concept code."""
+    # type: Literal['PermissibleValue'] = 'PermissibleValue'
+    value: str | None = None
+    synonyms: List[str] = []
+    ncit_concept_code: str | None = None
 
 
-class CDEWithModelInfo(CDE):
-    models: List[Property]
+class CDEPermissibleValues(BaseModel):
+    # type: Literal['CDEWithPermissibleValues'] = 'CDEWithPermissibleValues'
+    CDECode: str
+    CDEVersion: str | None = None
+    CDEFullName: str
+    permissibleValues: List[PermissibleValue] = []
+
+
+class CDEPermissibleValuesWithPropertyInfo(BaseModel):
+    """Response model for model-pvs endpoint."""
+    # type: Literal['CDEPermissibleValuesWithPropertyInfo'] = 'CDEPermissibleValuesWithPropertyInfo'
+    dataCommons: str
+    version: str
+    property: Property | None = None
+    CDECode: str | None = None
+    CDEVersion: str | None = None
+    CDEFullName: str | None = None
+    permissibleValues: List[PermissibleValue] = []
+
+
+class SimplifiedProperty(BaseModel):
+    # type: Literal['SimplifiedProperty'] = 'SimplifiedProperty'
+    model: str
+    property: str
+    version: str | None = None
+
+
+class CDEPermissibleValuesWithModelInfo(BaseModel):
+    """Response model for model-pvs endpoint."""
+    # type: Literal['CDEPermissibleValuesWithModelInfo'] = 'CDEPermissibleValuesWithModelInfo'
+    models: List[SimplifiedProperty] = []
+    CDECode: str | None = None
+    CDEVersion: str | None = None
+    CDEFullName: str | None = None
+    permissibleValues: List[PermissibleValue] = []
+
