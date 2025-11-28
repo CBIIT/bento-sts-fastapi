@@ -64,7 +64,7 @@ def pvs_synonyms_model_version_get(request: Request, model: str, version: str):
         stmt,
         {"p0": model, "p1": version}
     )
-    return ret
+    return [record.data() if hasattr(record, 'data') else dict(record.items()) for record in ret]
     
 
 @router.get(
