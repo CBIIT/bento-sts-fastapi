@@ -199,6 +199,17 @@ class TestModelRouter:
                                        "/property/meddra_disease_code/terms")
         assert response.status_code == 200
         assert isinstance(response.json(), list)
+
+    def test_property_pvs_get(self, test_sts_client):
+        response = test_sts_client.get("/v2/terms/cde-pvs/image_collection_name/pvs")
+        assert response.status_code == 200
+        assert isinstance(response.json(), list)
+
+    def test_property_pvs_get_with_pagination(self, test_sts_client):
+        response = test_sts_client.get("/v2/terms/cde-pvs/image_collection_name/pvs?skip=0&limit=10")
+        assert response.status_code == 200
+        assert isinstance(response.json(), list)
+        assert len(response.json()) <= 10
         
     def test_model_node_property_terms_count_get(self, test_sts_client, model_info):
         response = test_sts_client.get("/v2/model/CTDC/version/1.7.0/node/diagnosis"

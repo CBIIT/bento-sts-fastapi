@@ -109,49 +109,65 @@ def cde_pvs_by_id_with_version_get(request: Request, id: str, version: str):
     summary="Get PVs for a given handle property."
 )
 def cde_pvs_by_property_get(request: Request, prop: str):
-    stmt = """
-    MATCH (p:property {handle: $p0})
+    NULL_CDE_ID = '16476366|1'
+    stmt = f"""
+    // start with the property handle to find the specific property
+    MATCH (p:property {{handle: $p0}})
     WITH p
+    // get the cde that is attached to this property
     OPTIONAL MATCH (p)-[:has_concept]->(:concept)<-[:represents]-(cde:term)
       WHERE toLower(cde.origin_name) CONTAINS 'cadsr'
-    OPTIONAL MATCH (p)-[:has_tag]->(use_null_tag:tag {key: "useNullCDE"})
+    // check if the property has the useNullCDE tag
+    OPTIONAL MATCH (p)-[:has_tag]->(use_null_tag:tag {{key: "useNullCDE"}})
+    // ensure we have a cde and extract the cde handle and useNullCDE flag
     WITH DISTINCT p, cde,
       cde.origin_id + "|" + COALESCE(cde.origin_version, "") AS cde_hdl,
       CASE WHEN cde IS NOT NULL THEN true ELSE false END AS has_cde,
       ANY(ut IN COLLECT(use_null_tag) WHERE ut.value IN ["Yes", "True"] OR ut.value = true) AS should_use_null_cde
     WHERE cde IS NOT NULL
+    // collect all model versions that use this property
     OPTIONAL MATCH (n0:node)-[:has_property]->(p)
     WITH p, cde, cde_hdl, has_cde, should_use_null_cde,
-      COLLECT(DISTINCT {model: n0.model, version: n0.version}) AS model_versions
+      COLLECT(DISTINCT {{model: n0.model, version: n0.version}}) AS model_versions
     WHERE SIZE(model_versions) > 0
     UNWIND model_versions AS mv
     OPTIONAL MATCH (p)-[:has_value_set]->(:value_set)-[:has_term]->(model_pv:term)
     WITH p, cde, cde_hdl, has_cde, should_use_null_cde, mv,
       COLLECT(DISTINCT model_pv) AS model_pvs
-    OPTIONAL MATCH (v:value_set {handle: cde_hdl})-[:has_term]->(cde_pv:term)
+    // Now get the CDE's pvs for this property
+    OPTIONAL MATCH (v:value_set {{handle: cde_hdl}})-[:has_term]->(cde_pv:term)
     WITH p, cde, has_cde, should_use_null_cde, mv, model_pvs,
       [pv IN COLLECT(DISTINCT cde_pv) WHERE pv IS NOT NULL] AS cde_pvs
-    OPTIONAL MATCH (null_vs:value_set {handle: '16476366|1'})-[:has_term]->(null_pv:term)
+    // Add the null CDE pvs if should_use_null_cde is set
+    OPTIONAL MATCH (null_vs:value_set {{handle: '{NULL_CDE_ID}'}})-[:has_term]->(null_pv:term)
     WITH p, cde, has_cde, should_use_null_cde, mv, model_pvs, cde_pvs,
       CASE WHEN should_use_null_cde THEN COLLECT(DISTINCT null_pv) ELSE [] END AS null_pvs
     WITH p, cde, has_cde, should_use_null_cde, mv, model_pvs, cde_pvs, null_pvs,
       CASE 
+        // when there are cde_pvs and there are no URLs in the pv list
+        // return cde and null pvs as the property's pv set:
         WHEN has_cde AND SIZE(cde_pvs) > 0 AND NONE(pv in cde_pvs WHERE pv.value =~ 'https?://.*')
           THEN cde_pvs + null_pvs
+        // when the "value set" of the CDE is just a url ("values by reference"), return
+        // the model's defined enum as the pvs
         WHEN has_cde AND SIZE(cde_pvs) > 0 AND ANY(pv in cde_pvs WHERE pv.value =~ 'https?://.*') AND SIZE(model_pvs) > 0
           THEN model_pvs + null_pvs
+        // when there is no cde but there are model pvs
         WHEN NOT has_cde AND SIZE(model_pvs) > 0
           THEN model_pvs + null_pvs
+        // when only null pvs are available
         WHEN SIZE(null_pvs) > 0
           THEN null_pvs
         ELSE [null]
       END AS pvs
     WHERE SIZE(pvs) > 0
     UNWIND pvs AS pv
-    OPTIONAL MATCH (pv)-[:represents]->(c_cadsr:concept)<-[:represents]-(ncit_term:term {origin_name: 'NCIt'}),
-      (c_cadsr)-[:has_tag]->(:tag {key: "mapping_source", value: "caDSR"})
+    // for each pv, obtain the NCIt term associated with it, according to caDSR
+    OPTIONAL MATCH (pv)-[:represents]->(c_cadsr:concept)<-[:represents]-(ncit_term:term {{origin_name: 'NCIt'}}),
+      (c_cadsr)-[:has_tag]->(:tag {{key: "mapping_source", value: "caDSR"}})
+    // find any synonyms associated with the NCIt term in the NCI data
     OPTIONAL MATCH (ncit_term)-[:represents]->(c_ncim:concept)<-[:represents]-(syn:term),
-      (c_ncim)-[:has_tag]->(:tag {key: "mapping_source", value: "NCIm"})
+      (c_ncim)-[:has_tag]->(:tag {{key: "mapping_source", value: "NCIm"}})
     WHERE pv IS NOT NULL AND (syn IS NULL OR (pv <> syn AND pv.value <> syn.value))
     WITH cde, p, mv, pv, pv.value as pv_val, 
       ncit_term.origin_id AS ncit_oid,
@@ -160,7 +176,7 @@ def cde_pvs_by_property_get(request: Request, prop: str):
     WITH cde, p, mv, pv_val, ncit_oid,
       CASE WHEN ncit_value IS NOT NULL THEN distinct_syn_vals + [ncit_value] ELSE distinct_syn_vals END AS syn_vals
     WITH cde, p, mv,
-        CASE WHEN pv_val IS NOT NULL THEN COLLECT(DISTINCT {value: pv_val, synonyms: syn_vals, ncit_concept_code: ncit_oid}) ELSE [] END AS formatted_pvs
+        CASE WHEN pv_val IS NOT NULL THEN COLLECT(DISTINCT {{value: pv_val, synonyms: syn_vals, ncit_concept_code: ncit_oid}}) ELSE [] END AS formatted_pvs
     RETURN DISTINCT
       cde.origin_id AS CDECode,
       cde.origin_version AS CDEVersion,
