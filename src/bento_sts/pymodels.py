@@ -42,8 +42,8 @@ class Term(BaseModel):
     value: str
     origin_name: str
     handle: str | None = None
-    origin_version: str | None = None
-    origin_id: str | None = None
+    # origin_version: str | None = None
+    # origin_id: str | None = None
     nanoid: str
 
 
