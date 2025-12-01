@@ -30,7 +30,7 @@ class Property(Entity):
     is_key: bool | None = None
     is_strict: bool | None = None
     is_nullable: bool | None = None
-    is_required: bool | None = None
+    is_required: str | bool | None = None
     value_domain: str
     item_domain: str | None = None
     units: str | None = None
