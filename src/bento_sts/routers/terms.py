@@ -101,7 +101,7 @@ def cde_pvs_by_id_with_version_get(request: Request, id: str, version: str):
         stmt,
         {"p0": id, "p1": version}
     )
-    return ret
+    return [record.data() if hasattr(record, 'data') else dict(record.items()) for record in ret]
     
 
 @router.get(
