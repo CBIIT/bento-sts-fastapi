@@ -87,7 +87,7 @@ class CDEWithModelInfo(CDE):
 
 
 class PermissibleValue(BaseModel):
-    value: str | None = None
+    value: str
     ncit_concept_code: str | None = None
     synonyms: List[str] | None = None
 
