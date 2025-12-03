@@ -84,3 +84,16 @@ class CDEWithPermissibleValues(CDE):
 
 class CDEWithModelInfo(CDE):
     models: List[Property]
+
+
+class PermissibleValue(BaseModel):
+    value: str | None = None
+    ncit_concept_code: str | None = None
+    synonyms: List[str] | None = None
+
+
+class CDEPermissibleValuesModel(BaseModel):
+    model: str
+    property: str
+    version: str
+    permissibleValues: List[PermissibleValue]

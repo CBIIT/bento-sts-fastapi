@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, Request
+from typing import List
 from ..dependencies import paging_params
-from ..pymodels import Term, CDE
-from ..converters import neo_to_py, neo_to_cde
+from ..pymodels import CDEPermissibleValuesModel
 
 router = APIRouter(
     prefix="/terms",
@@ -15,7 +15,8 @@ router = APIRouter(
 
 @router.get(
     "/model-pvs/{model}/{version}/pvs",
-    summary="Get Permissible Values and Synonyms for a specified model and version."
+    summary="Get Permissible Values and Synonyms for a specified model and version.",
+    response_model=List[CDEPermissibleValuesModel]
 )
 def pvs_synonyms_model_version_get(request: Request, model: str, version: str):
     stmt = """
@@ -52,9 +53,9 @@ def pvs_synonyms_model_version_get(request: Request, model: str, version: str):
         THEN distinct_syn_vals + [ncit_value]
         ELSE distinct_syn_vals END AS syn_vals
     WITH prop, CDECode, CDEVersion, CDEFullName, model_pvs,
-    collect({value: pv_val, synonyms: syn_vals, ncit_concept_code: ncit_oid}) AS formatted_pvs
-    RETURN $p0 AS dataCommons, $p1 AS version,
-      prop AS property, CDECode, CDEVersion, CDEFullName,
+    [pv_item IN collect({value: pv_val, synonyms: syn_vals, ncit_concept_code: ncit_oid}) WHERE pv_item.value IS NOT NULL] AS formatted_pvs
+    RETURN $p0 AS model, $p1 AS version,
+      prop.handle AS property,
       formatted_pvs AS permissibleValues
 """
     stmt = " ".join([stmt, 
