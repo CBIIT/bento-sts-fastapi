@@ -14,7 +14,7 @@ class Entity(BaseModel):
 class Model(Entity):
     type: Literal['Model'] = 'Model'
     name: str | None = None
-    repo: Url | None = None
+    repository: Url | None = None
     is_latest_version: bool
     nanoid: str | None = None
 
@@ -30,7 +30,7 @@ class Property(Entity):
     is_key: bool | None = None
     is_strict: bool | None = None
     is_nullable: bool | None = None
-    is_required: bool | None = None
+    is_required: str | bool | None = None
     value_domain: str
     item_domain: str | None = None
     units: str | None = None
