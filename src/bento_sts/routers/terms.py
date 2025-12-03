@@ -20,7 +20,7 @@ router = APIRouter(
 )
 def pvs_synonyms_model_version_get(request: Request, model: str, property: str = "", version: str | None = None):
     # If version is not provided, get the latest version for the model
-    if version is None:
+    if version is None or version.strip() == "":
         latest_version_stmt = """
         MATCH (m:model {handle:$p0, is_latest_version:true})
         RETURN m.version AS version
