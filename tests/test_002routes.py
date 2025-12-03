@@ -245,6 +245,10 @@ class TestTermsRouter:
             props_response = test_sts_client.get(
                 f"/v2/terms/model-pvs/{model_info['name']}/?version={model_info['version']}&limit=1"
             )
+
+            assert props_response.status_code == 200
+            assert isinstance(props_response.json(), list)
+
             if props_response.json():
                 prop_handle = props_response.json()[0]["property"]
                 response = test_sts_client.get(
