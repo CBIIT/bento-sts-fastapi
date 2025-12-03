@@ -74,7 +74,7 @@ def pvs_synonyms_model_version_get(request: Request, model: str, property: str =
         ELSE distinct_syn_vals END AS syn_vals
     WITH prop, CDECode, CDEVersion, CDEFullName, model_pvs,
     [pv_item IN collect({value: pv_val, synonyms: syn_vals, ncit_concept_code: ncit_oid}) WHERE pv_item.value IS NOT NULL] AS formatted_pvs
-    RETURN $p0 AS model, $p1 AS version,
+    RETURN DISTINCT $p0 AS model, $p1 AS version,
       prop.handle AS property,
       formatted_pvs AS permissibleValues
 """
