@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, Request
+from typing import List
 from ..dependencies import paging_params
-from ..pymodels import Term, CDE
-from ..converters import neo_to_py, neo_to_cde
+from ..pymodels import CDEPermissibleValuesModel
 
 router = APIRouter(
     prefix="/terms",
@@ -14,13 +14,34 @@ router = APIRouter(
     )
 
 @router.get(
-    "/model-pvs/{model}/{version}/pvs",
-    summary="Get Permissible Values and Synonyms for a specified model and version."
+    "/model-pvs/{model}/{property:path}",
+    summary="Get Permissible Values and Synonyms for a model, optionally filtered by property and version.",
+    response_model=List[CDEPermissibleValuesModel]
 )
-def pvs_synonyms_model_version_get(request: Request, model: str, version: str):
+def pvs_synonyms_model_version_get(request: Request, model: str, property: str = "", version: str | None = None):
+    # If version is not provided, get the latest version for the model
+    if version is None or version.strip() == "":
+        latest_version_stmt = """
+        MATCH (m:model {handle:$p0, is_latest_version:true})
+        RETURN m.version AS version
+        """
+        result = request.state.mdb.get_with_statement(latest_version_stmt, {"p0": model})
+        if result:
+            version = result[0].get("version")
+        else:
+            return []
+    
+    # Clean property: remove quotes and whitespace; Swagger doc requires to reqeust a value input.
+    property = property.strip().strip('"').strip("'").strip()
+    
+    # Build parameters and query based on whether property is specified
+    has_property = property and property != ""
+    params = {"p0": model, "p1": version} | ({"p2": property} if has_property else {})
+    
     stmt = """
-    MATCH (n0:node {model:$p0,version:$p1})-[r0:has_property]->(n1:property)
-    WITH collect(n1) AS props UNWIND props AS prop
+    MATCH (n0:node {model:$p0})-[r0:has_property]->(n1:property)
+    WITH n1 AS prop
+    WHERE n0.version = $p1""" + (" AND prop.handle = $p2" if has_property else "") + """
     OPTIONAL MATCH (prop)-[:has_concept]->(c:concept)<-[:represents]-(cde:term)
       WHERE toLower(cde.origin_name) CONTAINS "cadsr"
     OPTIONAL MATCH (prop)-[:has_value_set]->(:value_set)-[:has_term]->(t:term)
@@ -52,9 +73,9 @@ def pvs_synonyms_model_version_get(request: Request, model: str, version: str):
         THEN distinct_syn_vals + [ncit_value]
         ELSE distinct_syn_vals END AS syn_vals
     WITH prop, CDECode, CDEVersion, CDEFullName, model_pvs,
-    collect({value: pv_val, synonyms: syn_vals, ncit_concept_code: ncit_oid}) AS formatted_pvs
-    RETURN $p0 AS dataCommons, $p1 AS version,
-      prop AS property, CDECode, CDEVersion, CDEFullName,
+    [pv_item IN collect({value: pv_val, synonyms: syn_vals, ncit_concept_code: ncit_oid}) WHERE pv_item.value IS NOT NULL] AS formatted_pvs
+    RETURN DISTINCT $p0 AS model, $p1 AS version,
+      prop.handle AS property,
       formatted_pvs AS permissibleValues
 """
     stmt = " ".join([stmt, 
@@ -62,7 +83,7 @@ def pvs_synonyms_model_version_get(request: Request, model: str, version: str):
                      f"LIMIT {request.state.limit}" if request.state.limit else ""])
     ret = request.state.mdb.get_with_statement(
         stmt,
-        {"p0": model, "p1": version}
+        params
     )
     return [record.data() if hasattr(record, 'data') else dict(record.items()) for record in ret]
     
@@ -102,49 +123,3 @@ def cde_pvs_by_id_with_version_get(request: Request, id: str, version: str):
         {"p0": id, "p1": version}
     )
     return [record.data() if hasattr(record, 'data') else dict(record.items()) for record in ret]
-    
-
-@router.get(
-    "/all-pvs",
-    summary="Get all PVs and synonyms for all models and CDEs"
-)
-def all_pvs_get(request: Request):
-    stmt = """
-    MATCH (cde:term)
-      WHERE toLower(cde.origin_name) CONTAINS "cadsr"
-    WITH cde
-    MATCH (ent)-[:has_property]->(p:property)-[:has_concept]->(:concept)<-[:represents]-(cde)
-      WHERE p.model IS NOT NULL AND p.version IS NOT NULL
-    WITH cde,
-      collect(DISTINCT {model: p.model, version: p.version, property: ent.handle + "." + p.handle}) AS models
-    WITH cde, models, cde.origin_id + "|" + coalesce(cde.origin_version, "") AS cde_hdl
-    OPTIONAL MATCH (prop:property)-[:has_concept]->(c:concept)<-[:represents]-(cde)
-    OPTIONAL MATCH (prop)-[:has_value_set]->(:value_set)-[:has_term]->(model_pv:term)
-    WITH cde, models, cde_hdl, collect(DISTINCT model_pv) AS model_pvs
-    OPTIONAL MATCH (vs:value_set {handle: cde_hdl})-[:has_term]->(cde_pv:term)
-    WITH cde, models, model_pvs, collect(DISTINCT cde_pv) AS cde_pvs
-    WITH cde, models, model_pvs, cde_pvs,
-      CASE WHEN size(cde_pvs) > 0 AND NONE(p in cde_pvs WHERE p.value =~ "https?://.*") THEN cde_pvs WHEN size(cde_pvs) > 0 AND ANY(p in cde_pvs WHERE p.value =~ "https?://.*") AND size(model_pvs) > 0 THEN model_pvs ELSE [null] END AS pvs
-    WHERE size(pvs) > 0
-    UNWIND pvs AS pv
-    OPTIONAL MATCH (pv)-[:represents]->(c_cadsr:concept)<-[:represents]-(ncit_term:term {origin_name: "NCIt"}), (c_cadsr)-[:has_tag]->(:tag {key: "mapping_source", value: "caDSR"})
-    OPTIONAL MATCH (ncit_term)-[:represents]->(c_ncim:concept)<-[:represents]-(syn:term), (c_ncim)-[:has_tag]->(:tag {key: "mapping_source", value: "NCIm"})
-      WHERE pv IS NOT NULL AND pv <> syn AND pv.value <> syn.value
-    WITH cde, pv, models, pv.value as pv_val, ncit_term.origin_id AS ncit_oid,
-      ncit_term.value AS ncit_value,
-      collect(DISTINCT syn.value) AS distinct_syn_vals WITH cde, models, pv_val,
-      ncit_oid,
-      CASE WHEN ncit_value IS NOT NULL THEN distinct_syn_vals + [ncit_value] ELSE distinct_syn_vals END AS syn_vals
-    WITH cde, models,
-      CASE WHEN pv_val IS NOT NULL THEN collect({value: pv_val, synonyms: syn_vals, ncit_concept_code: ncit_oid}) ELSE [] END AS formatted_pvs
-    RETURN cde.origin_id AS CDECode, cde.origin_version AS CDEVersion,
-      cde.value AS CDEFullName, models, formatted_pvs AS permissibleValues"""
-
-    stmt = " ". join([stmt,
-                      f"SKIP {request.state.skip} " if request.state.skip else "",
-                      f"LIMIT {request.state.limit}" if request.state.limit else ""])
-    ret = request.state.mdb.get_with_statement(
-        stmt,
-        {}
-    )
-    return ret
