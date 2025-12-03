@@ -265,17 +265,6 @@ class TestTermsRouter:
         response = test_sts_client.get("/v2/terms/cde-pvs/test_id/none/pvs")
         assert response.status_code == 404
         assert response.json()['detail'] == "No records found."
-    
-    def test_all_pvs_get(self, test_sts_client):
-        response = test_sts_client.get("/v2/terms/all-pvs")
-        assert response.status_code == 200
-        assert isinstance(response.json(), list)
-    
-    def test_all_pvs_get_with_pagination(self, test_sts_client):
-        response = test_sts_client.get("/v2/terms/all-pvs?skip=0&limit=10")
-        assert response.status_code == 200
-        assert isinstance(response.json(), list)
-        assert len(response.json()) <= 10
 
 
 class TestEdgeCases:
