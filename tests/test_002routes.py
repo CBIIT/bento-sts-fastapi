@@ -234,15 +234,29 @@ class TestTermsRouter:
     def test_pvs_synonyms_model_version_get(self, test_sts_client, model_info):
         if model_info:
             response = test_sts_client.get(
-                f"/v2/terms/model-pvs/{model_info['name']}/{model_info['version']}/pvs"
+                f"/v2/terms/model-pvs/{model_info['name']}/?version={model_info['version']}"
             )
             assert response.status_code == 200
             assert isinstance(response.json(), list)
     
+    def test_pvs_synonyms_model_version_get_with_property(self, test_sts_client, model_info):
+        if model_info:
+            # Get the first property from the model
+            props_response = test_sts_client.get(
+                f"/v2/terms/model-pvs/{model_info['name']}/?version={model_info['version']}&limit=1"
+            )
+            if props_response.json():
+                prop_handle = props_response.json()[0]["property"]
+                response = test_sts_client.get(
+                    f"/v2/terms/model-pvs/{model_info['name']}/{prop_handle}?version={model_info['version']}"
+                )
+                assert response.status_code == 200
+                assert isinstance(response.json(), list)
+    
     def test_pvs_synonyms_model_version_get_with_pagination(self, test_sts_client, model_info):
         if model_info:
             response = test_sts_client.get(
-                f"/v2/terms/model-pvs/{model_info['name']}/{model_info['version']}/pvs?skip=0&limit=5"
+                f"/v2/terms/model-pvs/{model_info['name']}/?version={model_info['version']}&skip=0&limit=5"
             )
             assert response.status_code == 200
             assert isinstance(response.json(), list)
@@ -250,7 +264,7 @@ class TestTermsRouter:
     
     def test_pvs_synonyms_model_version_get_invalid_model(self, test_sts_client):
         response = test_sts_client.get(
-            "/v2/terms/model-pvs/nonexistent_model/1.0.0/pvs"
+            "/v2/terms/model-pvs/nonexistent_model/?version=1.0.0"
         )
         assert response.status_code == 404
         assert response.json()['detail'] == "No records found."
