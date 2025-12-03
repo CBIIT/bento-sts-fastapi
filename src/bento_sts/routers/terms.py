@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, Request
+from typing import List
 from ..dependencies import paging_params
-from ..pymodels import Term, CDE
-from ..converters import neo_to_py, neo_to_cde
+from ..pymodels import CDEPermissibleValuesModel
 
 router = APIRouter(
     prefix="/terms",
@@ -14,13 +14,34 @@ router = APIRouter(
     )
 
 @router.get(
-    "/model-pvs/{model}/{version}/pvs",
-    summary="Get Permissible Values and Synonyms for a specified model and version."
+    "/model-pvs/{model}/{property:path}",
+    summary="Get Permissible Values and Synonyms for a model, optionally filtered by property and version.",
+    response_model=List[CDEPermissibleValuesModel]
 )
-def pvs_synonyms_model_version_get(request: Request, model: str, version: str):
+def pvs_synonyms_model_version_get(request: Request, model: str, property: str = "", version: str | None = None):
+    # If version is not provided, get the latest version for the model
+    if version is None or version.strip() == "":
+        latest_version_stmt = """
+        MATCH (m:model {handle:$p0, is_latest_version:true})
+        RETURN m.version AS version
+        """
+        result = request.state.mdb.get_with_statement(latest_version_stmt, {"p0": model})
+        if result:
+            version = result[0].get("version")
+        else:
+            return []
+    
+    # Clean property: remove quotes and whitespace; Swagger doc requires to reqeust a value input.
+    property = property.strip().strip('"').strip("'").strip()
+    
+    # Build parameters and query based on whether property is specified
+    has_property = property and property != ""
+    params = {"p0": model, "p1": version} | ({"p2": property} if has_property else {})
+    
     stmt = """
-    MATCH (n0:node {model:$p0,version:$p1})-[r0:has_property]->(n1:property)
-    WITH collect(n1) AS props UNWIND props AS prop
+    MATCH (n0:node {model:$p0})-[r0:has_property]->(n1:property)
+    WITH n1 AS prop
+    WHERE n0.version = $p1""" + (" AND prop.handle = $p2" if has_property else "") + """
     OPTIONAL MATCH (prop)-[:has_concept]->(c:concept)<-[:represents]-(cde:term)
       WHERE toLower(cde.origin_name) CONTAINS "cadsr"
     OPTIONAL MATCH (prop)-[:has_value_set]->(:value_set)-[:has_term]->(t:term)
@@ -52,9 +73,9 @@ def pvs_synonyms_model_version_get(request: Request, model: str, version: str):
         THEN distinct_syn_vals + [ncit_value]
         ELSE distinct_syn_vals END AS syn_vals
     WITH prop, CDECode, CDEVersion, CDEFullName, model_pvs,
-    collect({value: pv_val, synonyms: syn_vals, ncit_concept_code: ncit_oid}) AS formatted_pvs
-    RETURN $p0 AS dataCommons, $p1 AS version,
-      prop AS property, CDECode, CDEVersion, CDEFullName,
+    [pv_item IN collect({value: pv_val, synonyms: syn_vals, ncit_concept_code: ncit_oid}) WHERE pv_item.value IS NOT NULL] AS formatted_pvs
+    RETURN DISTINCT $p0 AS model, $p1 AS version,
+      prop.handle AS property,
       formatted_pvs AS permissibleValues
 """
     stmt = " ".join([stmt, 
@@ -62,7 +83,7 @@ def pvs_synonyms_model_version_get(request: Request, model: str, version: str):
                      f"LIMIT {request.state.limit}" if request.state.limit else ""])
     ret = request.state.mdb.get_with_statement(
         stmt,
-        {"p0": model, "p1": version}
+        params
     )
     return [record.data() if hasattr(record, 'data') else dict(record.items()) for record in ret]
     
