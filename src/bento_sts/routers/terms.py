@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, Request
 from typing import List
 from ..dependencies import paging_params
-from ..pymodels import CDEPermissibleValuesModel
+from ..pymodels import CDEPermissibleValuesModel, CDEPermissibleValues
 
 router = APIRouter(
     prefix="/terms",
@@ -90,7 +90,8 @@ def pvs_synonyms_model_version_get(request: Request, model: str, property: str =
 
 @router.get(
     "/cde-pvs/{id}/{version}/pvs",
-    summary="Get PVs for a given CDE id and version."
+    summary="Get PVs for a given CDE id and version.",
+    response_model=List[CDEPermissibleValues]
 )
 def cde_pvs_by_id_with_version_get(request: Request, id: str, version: str):
     stmt = """
@@ -113,7 +114,7 @@ def cde_pvs_by_id_with_version_get(request: Request, id: str, version: str):
       collect(DISTINCT syn.value) AS distinct_syn_vals
     WITH n0, value_set_url, pvs,
       CASE WHEN pv_val IS NULL THEN [] ELSE collect({value: pv_val, synonyms: CASE WHEN ncit_value IS NOT NULL THEN distinct_syn_vals + [ncit_value] ELSE distinct_syn_vals END, ncit_concept_code: ncit_oid}) END AS permissibleValues
-    RETURN n0.origin_id AS CDECode, n0.origin_version AS CDEVersion,
+    RETURN n0.origin_id AS CDECode, n0.origin_version AS version,
       n0.value AS CDEFullName, permissibleValues"""
     stmt = " ".join([stmt,
                      f"SKIP {request.state.skip} " if request.state.skip else "",
