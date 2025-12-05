@@ -97,3 +97,10 @@ class CDEPermissibleValuesModel(BaseModel):
     property: str
     version: str
     permissibleValues: List[PermissibleValue]
+
+
+class CDEPermissibleValues(BaseModel):
+    CDECode: str
+    CDEFullName: str
+    CDEVersion: str
+    permissibleValues: List[PermissibleValue]

@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, Request
 from typing import List
 from ..dependencies import paging_params
-from ..pymodels import CDEPermissibleValuesModel
+from ..pymodels import CDEPermissibleValuesModel, CDEPermissibleValues
 
 router = APIRouter(
     prefix="/terms",
@@ -90,7 +90,8 @@ def pvs_synonyms_model_version_get(request: Request, model: str, property: str =
 
 @router.get(
     "/cde-pvs/{id}/{version}/pvs",
-    summary="Get PVs for a given CDE id and version."
+    summary="Get PVs for a given CDE id and version.",
+    response_model=List[CDEPermissibleValues]
 )
 def cde_pvs_by_id_with_version_get(request: Request, id: str, version: str):
     stmt = """
