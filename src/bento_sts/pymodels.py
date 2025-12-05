@@ -102,5 +102,5 @@ class CDEPermissibleValuesModel(BaseModel):
 class CDEPermissibleValues(BaseModel):
     CDECode: str
     CDEFullName: str
-    version: str
+    CDEVersion: str
     permissibleValues: List[PermissibleValue]

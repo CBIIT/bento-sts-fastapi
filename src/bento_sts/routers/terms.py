@@ -114,7 +114,7 @@ def cde_pvs_by_id_with_version_get(request: Request, id: str, version: str):
       collect(DISTINCT syn.value) AS distinct_syn_vals
     WITH n0, value_set_url, pvs,
       CASE WHEN pv_val IS NULL THEN [] ELSE collect({value: pv_val, synonyms: CASE WHEN ncit_value IS NOT NULL THEN distinct_syn_vals + [ncit_value] ELSE distinct_syn_vals END, ncit_concept_code: ncit_oid}) END AS permissibleValues
-    RETURN n0.origin_id AS CDECode, n0.origin_version AS version,
+    RETURN n0.origin_id AS CDECode, n0.origin_version AS CDEVersion,
       n0.value AS CDEFullName, permissibleValues"""
     stmt = " ".join([stmt,
                      f"SKIP {request.state.skip} " if request.state.skip else "",
