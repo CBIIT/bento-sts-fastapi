@@ -25,7 +25,6 @@ class Node(Entity):
 
 
 class PropertyBase(BaseModel):
-    """Base fields for Property-like objects"""
     model: str
     is_key: bool | None = None
     is_strict: bool | None = None
