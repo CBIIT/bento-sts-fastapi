@@ -32,11 +32,11 @@ class PropertyBase(BaseModel):
     is_nullable: bool | None = None
     is_required: str | bool | None = None
     value_domain: str
-    item_domain: str | None = None
 
 
 class Property(Entity, PropertyBase):
     type: Literal['Property'] = 'Property'
+    item_domain: str | None = None
     units: str | None = None
     pattern: str | None = None
     desc: str | None = None
