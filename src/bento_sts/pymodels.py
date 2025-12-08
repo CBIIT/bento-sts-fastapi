@@ -24,17 +24,21 @@ class Node(Entity):
     model: str
 
 
-class Property(Entity):
-    type: Literal['Property'] = 'Property'
+class PropertyBase(BaseModel):
     model: str
     is_key: bool | None = None
     is_strict: bool | None = None
     is_nullable: bool | None = None
     is_required: str | bool | None = None
     value_domain: str
+
+
+class Property(Entity, PropertyBase):
+    type: Literal['Property'] = 'Property'
     item_domain: str | None = None
     units: str | None = None
     pattern: str | None = None
+    desc: str | None = None
 
 
 class Term(BaseModel):
@@ -97,3 +101,17 @@ class CDEPermissibleValuesModel(BaseModel):
     property: str
     version: str
     permissibleValues: List[PermissibleValue]
+
+
+class CDEPermissibleValues(BaseModel):
+    CDECode: str
+    CDEFullName: str
+    CDEVersion: str
+    permissibleValues: List[PermissibleValue]
+
+
+# Response models for specific endpoints
+class PropertyResponse(Entity, PropertyBase):
+    """Response model for /node/{nodeHandle}/properties endpoint"""
+    type: Literal['Property'] = 'Property'
+    desc: str | None = None
