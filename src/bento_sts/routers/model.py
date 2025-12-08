@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends, Request
 from typing import List
 from ..dependencies import paging_params
 from ..converters import neo_to_py
-from ..pymodels import Model, Node, Property, Term
+from ..pymodels import Model, Node, PropertyResponse, Term
 from ..utility.version_utils import model_version_compare
 
 router = APIRouter(
@@ -109,7 +109,7 @@ def model_model_handle_node_node_handle_get(request: Request, modelHandle: str, 
 def model_model_handle_node_node_handle_properties_get(
         request: Request,
         modelHandle: str, versionString: str,
-        nodeHandle: str) -> List[Property]:
+        nodeHandle: str) -> List[PropertyResponse]:
     stmt = " ".join([
         'MATCH (n0:node {model:$p0,version:$p1,handle:$p2})-[r0:has_property]->(n1:property) RETURN n1 as prop',
         f"SKIP {request.state.skip} " if request.state.skip else "",
@@ -120,7 +120,9 @@ def model_model_handle_node_node_handle_properties_get(
         {"p0": modelHandle, "p1": versionString, "p2": nodeHandle}
     )
     for row in rows:
-        ret.append(neo_to_py(row['prop']))
+        prop = neo_to_py(row['prop'])
+        # Convert to PropertyResponse model.
+        ret.append(PropertyResponse(**prop.model_dump()))
     
     return ret
     
@@ -144,13 +146,14 @@ def model_model_handle_node_node_handle_properties_count_get(request: Request, m
 )
 def model_model_handle_node_node_handle_property_prop_handle_get(
         request: Request, modelHandle: str, versionString: str,
-        nodeHandle: str, propHandle: str) -> Property:
+        nodeHandle: str, propHandle: str) -> PropertyResponse:
     stmt = 'MATCH (n0:node {model:$p0,version:$p1,handle:$p2})-[r0:has_property]->(n1:property {handle:$p3}) RETURN n1 as prop'
     ret = request.state.mdb.get_with_statement(
         stmt,
         {"p0": modelHandle, "p1": versionString, "p2": nodeHandle, "p3": propHandle}
     )
-    return neo_to_py(ret[0]['prop'])
+    prop = neo_to_py(ret[0]['prop'])
+    return PropertyResponse(**prop.model_dump())
     
 
 @router.get(
