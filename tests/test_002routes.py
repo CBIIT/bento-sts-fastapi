@@ -190,10 +190,15 @@ class TestModelRouter:
     
     def test_model_node_property_terms_get(self, test_sts_client):
         # test a property that has terms and one that doesn't
-        response = test_sts_client.get("/v2/model/CTDC/version/1.7.0/node/principal_investigator"
+        response = test_sts_client.get("/v2/model/CTDC/version/1.7.0/node/principal_investigator_not_exists"
                                        "/property/person_orcid/terms")
         assert response.status_code == 404
         assert response.json()['detail'] == "No records found."
+
+        response = test_sts_client.get("/v2/model/CTDC/version/1.7.0/node/principal_investigator"
+                                       "/property/person_orcid/terms")
+        assert response.status_code == 404
+        assert response.json()['detail'] == "Property exists, but does not use an acceptable value set."
 
         response = test_sts_client.get("/v2/model/CTDC/version/1.7.0/node/diagnosis"
                                        "/property/meddra_disease_code/terms")
