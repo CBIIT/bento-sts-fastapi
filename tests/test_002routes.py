@@ -197,7 +197,7 @@ class TestModelRouter:
 
         response = test_sts_client.get("/v2/model/CTDC/version/1.7.0/node/principal_investigator"
                                        "/property/person_orcid/terms")
-        assert response.status_code == 422
+        assert response.status_code == 404
         assert response.json()['detail'] == "Property exists, but does not use an acceptable value set."
 
         response = test_sts_client.get("/v2/model/CTDC/version/1.7.0/node/diagnosis"
