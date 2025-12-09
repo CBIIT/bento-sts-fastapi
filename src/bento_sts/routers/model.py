@@ -1,5 +1,5 @@
 from functools import cmp_to_key
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, Request, HTTPException
 from typing import List
 from ..dependencies import paging_params
 from ..converters import neo_to_py
@@ -11,9 +11,10 @@ router = APIRouter(
     tags=["model"],
     responses={
         404: {"description": "Not found."},
-        422: {"description": "Bad parameters (skip or limit?)"},
-    },
-    )
+    }
+)
+
+PROPERTY_NOT_EXISTS = "Property exists, but does not use an acceptable value set."
 
 
 @router.get(
@@ -160,13 +161,18 @@ def model_model_handle_node_node_handle_property_prop_handle_get(
     "/{modelHandle}/version/{versionString}/node/{nodeHandle}/property/{propHandle}/terms",
     summary="Get the terms (acceptable values) for specified property, if applicable to property.",
     dependencies=[Depends(paging_params)],
+    responses={
+        422: {"description": PROPERTY_NOT_EXISTS}
+    }
 )
 def model_model_handle_node_node_handle_property_prop_handle_terms_get(
         request: Request,
         modelHandle: str, versionString: str,
         nodeHandle: str, propHandle: str) -> List[Term]:
     stmt = " ".join([
-        'MATCH (n0:node {model:$p0,version:$p1,handle:$p2})-[r0:has_property]->(n1:property {handle:$p3})-[r1:has_value_set]->(n3:value_set)-[r2:has_term]->(n2:term) RETURN n2 as term',
+        'MATCH (n0:node {model:$p0,version:$p1,handle:$p2})-[r0:has_property]->(n1:property {handle:$p3})',
+        'OPTIONAL MATCH (n1)-[r1:has_value_set]->(n3:value_set)-[r2:has_term]->(n2:term)',
+        'RETURN n1 as prop, n2 as term',
         f"SKIP {request.state.skip} " if request.state.skip else "",
         f"LIMIT {request.state.limit}" if request.state.limit else ""])
     ret = []
@@ -174,19 +180,45 @@ def model_model_handle_node_node_handle_property_prop_handle_terms_get(
         stmt,
         {"p0": modelHandle, "p1": versionString, "p2": nodeHandle, "p3": propHandle}
     )
+    has_terms = False
     for row in rows:
-        ret.append(neo_to_py(row['term']))
+        if row['term'] is not None:
+            has_terms = True
+            ret.append(neo_to_py(row['term']))
+    
+    # Property exists but has no terms
+    if len(rows) > 0 and not has_terms:
+        raise HTTPException(
+            status_code=422,
+            detail=PROPERTY_NOT_EXISTS
+        )
+
     return ret
     
 
 @router.get(
     "/{modelHandle}/version/{versionString}/node/{nodeHandle}/property/{propHandle}/terms/count",
-    summary="Get number of  properties for specified node"
+    summary="Get number of  properties for specified node",
+    responses={
+        422: {"description": PROPERTY_NOT_EXISTS}
+    }
 )
 def model_model_handle_node_node_handle_property_prop_handle_terms_count_get(request: Request, modelHandle: str, versionString: str, nodeHandle: str, propHandle: str) -> int:
-    stmt = 'MATCH (n0:node {model:$p0,version:$p1,handle:$p2})-[r0:has_property]->(n1:property {handle:$p3})-[r1:has_value_set]->(n3:value_set)-[r2:has_term]->(n2:term) RETURN count(*) as count'
-    ret = request.state.mdb.get_with_statement(
+    stmt = " ".join([
+        'MATCH (n0:node {model:$p0,version:$p1,handle:$p2})-[r0:has_property]->(n1:property {handle:$p3})',
+        'OPTIONAL MATCH (n1)-[r1:has_value_set]->(n3:value_set)-[r2:has_term]->(n2:term)',
+        'RETURN n1 as prop, count(n2) as count'
+    ])
+    rows = request.state.mdb.get_with_statement(
         stmt,
         {"p0": modelHandle, "p1": versionString, "p2": nodeHandle, "p3": propHandle}
     )
-    return ret[0]['count']
+
+    # Property exists but has no terms
+    count = rows[0]['count']
+    if count == 0:
+        raise HTTPException(
+            status_code=422,
+            detail=PROPERTY_NOT_EXISTS
+        )
+    return count
