@@ -10,7 +10,8 @@ router = APIRouter(
     prefix="/model",
     tags=["model"],
     responses={
-        404: {"description": "Not found."},
+        404: {"description": "No records found or property exists, but does not use an acceptable value set."},
+        422: {"description": "Bad parameters (skip or limit?)"},
     }
 )
 
@@ -161,9 +162,6 @@ def model_model_handle_node_node_handle_property_prop_handle_get(
     "/{modelHandle}/version/{versionString}/node/{nodeHandle}/property/{propHandle}/terms",
     summary="Get the terms (acceptable values) for specified property, if applicable to property.",
     dependencies=[Depends(paging_params)],
-    responses={
-        422: {"description": PROPERTY_NOT_EXISTS}
-    }
 )
 def model_model_handle_node_node_handle_property_prop_handle_terms_get(
         request: Request,
@@ -189,7 +187,7 @@ def model_model_handle_node_node_handle_property_prop_handle_terms_get(
     # Property exists but has no terms
     if rows and not has_terms:
         raise HTTPException(
-            status_code=422,
+            status_code=404,
             detail=PROPERTY_NOT_EXISTS
         )
 
@@ -199,9 +197,6 @@ def model_model_handle_node_node_handle_property_prop_handle_terms_get(
 @router.get(
     "/{modelHandle}/version/{versionString}/node/{nodeHandle}/property/{propHandle}/terms/count",
     summary="Get number of  properties for specified node",
-    responses={
-        422: {"description": PROPERTY_NOT_EXISTS}
-    }
 )
 def model_model_handle_node_node_handle_property_prop_handle_terms_count_get(request: Request, modelHandle: str, versionString: str, nodeHandle: str, propHandle: str) -> int:
     stmt = " ".join([
@@ -218,7 +213,7 @@ def model_model_handle_node_node_handle_property_prop_handle_terms_count_get(req
     count = rows[0]['count']
     if count == 0:
         raise HTTPException(
-            status_code=422,
+            status_code=404,
             detail=PROPERTY_NOT_EXISTS
         )
     return count
