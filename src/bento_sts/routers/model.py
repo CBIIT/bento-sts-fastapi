@@ -185,9 +185,9 @@ def model_model_handle_node_node_handle_property_prop_handle_terms_get(
         if row['term'] is not None:
             has_terms = True
             ret.append(neo_to_py(row['term']))
-    
+
     # Property exists but has no terms
-    if len(rows) > 0 and not has_terms:
+    if rows and not has_terms:
         raise HTTPException(
             status_code=422,
             detail=PROPERTY_NOT_EXISTS
