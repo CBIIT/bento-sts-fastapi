@@ -147,7 +147,7 @@ def model_model_handle_node_node_handle_properties_get(
 
 @router.get(
     "/{modelHandle}/version/{versionString}/node/{nodeHandle}/properties/count",
-    summary="Get number of  properties for specified node"
+    summary="Get number of properties for specified node"
 )
 def model_model_handle_node_node_handle_properties_count_get(request: Request, modelHandle: str, versionString: str, nodeHandle: str) -> int:
     stmt = 'MATCH (n0:node {model:$p0,version:$p1,handle:$p2})-[r0:has_property]->(n1:property) RETURN count(n1) as count'
