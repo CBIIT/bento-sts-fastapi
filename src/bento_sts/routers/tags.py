@@ -8,8 +8,7 @@ router = APIRouter(
     prefix="/tags",
     tags=["tags"],
     responses={
-        404: {"description": "Not found."},
-        422: {"description": "Bad parameters (skip or limit?)"},
+        404: {"description": "Not found."}
     },
     )
 

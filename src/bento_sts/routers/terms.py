@@ -8,8 +8,7 @@ router = APIRouter(
     tags=["terms"],
     dependencies=[Depends(paging_params)],
     responses={
-        404: {"description": "Not found."},
-        422: {"description": "Bad parameters (skip or limit?)"},
+        404: {"description": "Not found."}
     },
     )
 

@@ -10,8 +10,7 @@ router = APIRouter(
     prefix="/model",
     tags=["model"],
     responses={
-        404: {"description": "No records found or property exists, but does not use an acceptable value set."},
-        422: {"description": "Bad parameters (skip or limit?)"},
+        404: {"description": "No records found or property exists, but does not use an acceptable value set."}
     }
 )
 
