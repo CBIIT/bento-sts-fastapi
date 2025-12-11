@@ -10,13 +10,29 @@ router = APIRouter(
     prefix="/model",
     tags=["model"],
     responses={
-        404: {"description": "No records found or property exists, but does not use an acceptable value set."},
+        404: {"description": "Not found."},
         422: {"description": "Bad parameters (skip or limit?)"},
     }
 )
 
 PROPERTY_NOT_EXISTS = "Property exists, but does not use an acceptable value set."
-
+PROPERTY_ERROR_EXAMPLES = {
+    "description": "Property not found or has no value set",
+    "content": {
+        "application/json": {
+            "examples": {
+                "no_value_set": {
+                    "summary": "Property exists but has no value set",
+                    "value": {"detail": "Property exists, but does not use an acceptable value set."}
+                },
+                "not_found": {
+                    "summary": "Not found",
+                    "value": {"detail": "Not found."}
+                }
+            }
+        }
+    }
+}
 
 @router.get(
     "/{modelHandle}/versions",
@@ -162,6 +178,9 @@ def model_model_handle_node_node_handle_property_prop_handle_get(
     "/{modelHandle}/version/{versionString}/node/{nodeHandle}/property/{propHandle}/terms",
     summary="Get the terms (acceptable values) for specified property, if applicable to property.",
     dependencies=[Depends(paging_params)],
+    responses={
+        404: PROPERTY_ERROR_EXAMPLES
+    }
 )
 def model_model_handle_node_node_handle_property_prop_handle_terms_get(
         request: Request,
@@ -197,6 +216,9 @@ def model_model_handle_node_node_handle_property_prop_handle_terms_get(
 @router.get(
     "/{modelHandle}/version/{versionString}/node/{nodeHandle}/property/{propHandle}/terms/count",
     summary="Get number of  properties for specified node",
+    responses={
+        404: PROPERTY_ERROR_EXAMPLES
+    }
 )
 def model_model_handle_node_node_handle_property_prop_handle_terms_count_get(request: Request, modelHandle: str, versionString: str, nodeHandle: str, propHandle: str) -> int:
     stmt = " ".join([
