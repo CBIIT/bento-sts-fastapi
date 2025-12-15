@@ -36,7 +36,7 @@ def pvs_synonyms_model_version_get(request: Request, model: str, property: str =
     
     # Build parameters and query based on whether property is specified
     has_property = property and property != ""
-    params = {"p0": model, "p1": version} | ({"p2": property} if has_property else {})
+    params = {"p0": model, "p1": version, "p3": request.state.skip, "p4": request.state.limit} | ({"p2": property} if has_property else {})
     
     stmt = """
     MATCH (n0:node {model:$p0})-[r0:has_property]->(n1:property)
@@ -76,11 +76,12 @@ def pvs_synonyms_model_version_get(request: Request, model: str, property: str =
     [pv_item IN collect({value: pv_val, synonyms: syn_vals, ncit_concept_code: ncit_oid}) WHERE pv_item.value IS NOT NULL] AS formatted_pvs
     RETURN DISTINCT $p0 AS model, $p1 AS version,
       prop.handle AS property,
-      formatted_pvs AS permissibleValues
+      CASE 
+        WHEN $p4 > 0 THEN formatted_pvs[$p3..($p3 + $p4)]
+        WHEN $p3 > 0 THEN formatted_pvs[$p3..]
+        ELSE formatted_pvs
+      END AS permissibleValues
 """
-    stmt = " ".join([stmt, 
-                     f"SKIP {request.state.skip} " if request.state.skip else "",
-                     f"LIMIT {request.state.limit}" if request.state.limit else ""])
     ret = request.state.mdb.get_with_statement(
         stmt,
         params
