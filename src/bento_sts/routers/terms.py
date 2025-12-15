@@ -16,7 +16,7 @@ router = APIRouter(
     responses={
         200: {"description": "Successful Response"},
         404: {"description": "Not found."},
-        422: {"description": "Bad parameters (skip or limit?)"},
+        422: {"description": "Bad parameters (model or property or version or skip or limit?)"},
     },
 )
 def pvs_synonyms_model_version_get(request: Request, model: str, property: str = "", version: str | None = None):
@@ -96,7 +96,7 @@ def pvs_synonyms_model_version_get(request: Request, model: str, property: str =
     responses={
         200: {"description": "Successful Response"},
         404: {"description": "Not found."},
-        422: {"description": "Bad parameters (skip or limit?)"},
+        422: {"description": "Bad parameters (id or version or skip or limit?)"},
     },
 )
 def cde_pvs_by_id_with_version_get(request: Request, id: str, version: str):

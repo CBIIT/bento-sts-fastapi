@@ -37,7 +37,10 @@ def tags_get(request: Request) -> List[Tag]:
 
 @router.get(
     "/count",
-    summary="Get number of tags present in MDB"
+    summary="Get number of tags present in MDB",
+    responses={
+        200: {"description": "Successful Response"},
+    },
 )
 def tags_count_get(request: Request) -> int:
     stmt = 'MATCH (n0:tag) RETURN count(n0) as count'
