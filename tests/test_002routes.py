@@ -269,8 +269,11 @@ class TestTermsRouter:
             )
             assert response.status_code == 200
             assert isinstance(response.json(), list)
-            assert len(response.json()) <= 5
-    
+            # Check that each property's permissibleValues array is limited to 5 or less
+            for item in response.json():
+                assert 'permissibleValues' in item
+                assert len(item['permissibleValues']) <= 5
+
     def test_pvs_synonyms_model_version_get_invalid_model(self, test_sts_client):
         response = test_sts_client.get(
             "/v2/terms/model-pvs/nonexistent_model/?version=1.0.0"
