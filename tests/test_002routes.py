@@ -36,7 +36,7 @@ class TestTagRouter:
     def test_tag_key_values_get_invalid(self, test_sts_client):
         response = test_sts_client.get("/v2/tag/nonexistent_key/values")
         assert response.status_code == 404
-        assert response.json()['detail'] == "No records found."
+        assert response.json()['detail'] == "Not found."
     
     def test_tag_key_value_entities_get(self, test_sts_client):
         # Get a tag first
@@ -103,7 +103,7 @@ class TestModelRouter:
     def test_model_versions_get_invalid(self, test_sts_client):
         response = test_sts_client.get("/v2/model/nonexistent_model/versions")
         assert response.status_code == 404
-        assert response.json()['detail'] == "No records found."
+        assert response.json()['detail'] == "Not found."
     
     def test_model_latest_version_get(self, test_sts_client, model_info):
         if model_info:
@@ -193,7 +193,7 @@ class TestModelRouter:
         response = test_sts_client.get("/v2/model/CTDC/version/1.7.0/node/principal_investigator_not_exists"
                                        "/property/person_orcid/terms")
         assert response.status_code == 404
-        assert response.json()['detail'] == "No records found."
+        assert response.json()['detail'] == "Not found."
 
         response = test_sts_client.get("/v2/model/CTDC/version/1.7.0/node/principal_investigator"
                                        "/property/person_orcid/terms")
@@ -222,7 +222,7 @@ class TestIdRouter:
     def test_id_get_invalid(self, test_sts_client):
         response = test_sts_client.get("/v2/id/i17Aa")
         assert response.status_code == 404
-        assert response.json()['detail'] == 'No records found.';
+        assert response.json()['detail'] == 'Not found.';
 
 
 class TestTermsRouter:
@@ -269,14 +269,17 @@ class TestTermsRouter:
             )
             assert response.status_code == 200
             assert isinstance(response.json(), list)
-            assert len(response.json()) <= 5
-    
+            # Check that each property's permissibleValues array is limited to 5 or less
+            for item in response.json():
+                assert 'permissibleValues' in item
+                assert len(item['permissibleValues']) <= 5
+
     def test_pvs_synonyms_model_version_get_invalid_model(self, test_sts_client):
         response = test_sts_client.get(
             "/v2/terms/model-pvs/nonexistent_model/?version=1.0.0"
         )
         assert response.status_code == 404
-        assert response.json()['detail'] == "No records found."
+        assert response.json()['detail'] == "Not found."
     
     def test_cde_pvs_by_id_with_version_get(self, test_sts_client):
         # Test with a specific CDE ID if you know one exists
@@ -287,7 +290,7 @@ class TestTermsRouter:
     def test_cde_pvs_by_id_without_version_get(self, test_sts_client):
         response = test_sts_client.get("/v2/terms/cde-pvs/test_id/none/pvs")
         assert response.status_code == 404
-        assert response.json()['detail'] == "No records found."
+        assert response.json()['detail'] == "Not found."
 
 
 class TestEdgeCases:

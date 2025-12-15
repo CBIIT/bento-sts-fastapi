@@ -10,10 +10,6 @@ from ..utility.version_utils import model_version_compare
 router = APIRouter(
     prefix="/models",
     tags=["models"],
-    responses={
-        404: {"description": "Not found."},
-        422: {"description": "Bad parameters (skip or limit?)"},
-    },
     )
 
 
@@ -21,6 +17,11 @@ router = APIRouter(
     "/",
     summary="Get info on available models",
     dependencies=[Depends(paging_params)],
+    responses={
+        200: {"description": "Successful Response"},
+        404: {"description": "Not found."},
+        422: {"description": "Bad parameters (skip or limit?)"},
+    },
 )
 def models_get(request: Request) -> List[Model]:
     stmt = " ".join(
@@ -39,7 +40,10 @@ def models_get(request: Request) -> List[Model]:
 
 @router.get(
     "/count",
-    summary="Get number of available models"
+    summary="Get number of available models",
+    responses={
+        200: {"description": "Successful Response"},
+    },
 )
 def models_count_get(request: Request) -> int:
     stmt = 'MATCH (n0:model) RETURN count(n0) as count'

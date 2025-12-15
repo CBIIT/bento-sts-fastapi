@@ -7,10 +7,6 @@ from ..pymodels import Tag
 router = APIRouter(
     prefix="/tags",
     tags=["tags"],
-    responses={
-        404: {"description": "Not found."},
-        422: {"description": "Bad parameters (skip or limit?)"},
-    },
     )
 
 
@@ -18,6 +14,11 @@ router = APIRouter(
     "/",
     summary="Get all tag nodes in MDB",
     dependencies=[Depends(paging_params)],
+    responses={
+        200: {"description": "Successful Response"},
+        404: {"description": "Not found."},
+        422: {"description": "Bad parameters (skip or limit?)"},
+    },
 )
 def tags_get(request: Request) -> List[Tag]:
     stmt = " ".join([
@@ -36,7 +37,10 @@ def tags_get(request: Request) -> List[Tag]:
 
 @router.get(
     "/count",
-    summary="Get number of tags present in MDB"
+    summary="Get number of tags present in MDB",
+    responses={
+        200: {"description": "Successful Response"},
+    },
 )
 def tags_count_get(request: Request) -> int:
     stmt = 'MATCH (n0:tag) RETURN count(n0) as count'
