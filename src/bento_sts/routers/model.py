@@ -15,7 +15,23 @@ router = APIRouter(
 )
 
 PROPERTY_NOT_EXISTS = "Property exists, but does not use an acceptable value set."
-
+PROPERTY_ERROR_EXAMPLES = {
+    "description": "Property not found or has no value set",
+    "content": {
+        "application/json": {
+            "examples": {
+                "no_value_set": {
+                    "summary": "Property exists but has no value set",
+                    "value": {"detail": "Property exists, but does not use an acceptable value set."}
+                },
+                "not_found": {
+                    "summary": "Not found",
+                    "value": {"detail": "Not found."}
+                }
+            }
+        }
+    }
+}
 
 @router.get(
     "/{modelHandle}/versions",
@@ -130,7 +146,7 @@ def model_model_handle_node_node_handle_properties_get(
 
 @router.get(
     "/{modelHandle}/version/{versionString}/node/{nodeHandle}/properties/count",
-    summary="Get number of  properties for specified node"
+    summary="Get number of properties for specified node"
 )
 def model_model_handle_node_node_handle_properties_count_get(request: Request, modelHandle: str, versionString: str, nodeHandle: str) -> int:
     stmt = 'MATCH (n0:node {model:$p0,version:$p1,handle:$p2})-[r0:has_property]->(n1:property) RETURN count(n1) as count'
@@ -161,6 +177,9 @@ def model_model_handle_node_node_handle_property_prop_handle_get(
     "/{modelHandle}/version/{versionString}/node/{nodeHandle}/property/{propHandle}/terms",
     summary="Get the terms (acceptable values) for specified property, if applicable to property.",
     dependencies=[Depends(paging_params)],
+    responses={
+        404: PROPERTY_ERROR_EXAMPLES
+    }
 )
 def model_model_handle_node_node_handle_property_prop_handle_terms_get(
         request: Request,
@@ -196,6 +215,9 @@ def model_model_handle_node_node_handle_property_prop_handle_terms_get(
 @router.get(
     "/{modelHandle}/version/{versionString}/node/{nodeHandle}/property/{propHandle}/terms/count",
     summary="Get number of  properties for specified node",
+    responses={
+        404: PROPERTY_ERROR_EXAMPLES
+    }
 )
 def model_model_handle_node_node_handle_property_prop_handle_terms_count_get(request: Request, modelHandle: str, versionString: str, nodeHandle: str, propHandle: str) -> int:
     stmt = " ".join([
