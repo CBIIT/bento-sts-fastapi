@@ -10,10 +10,6 @@ from ..pymodels import (
 router = APIRouter(
     prefix="/tag",
     tags=["tag"],
-    responses={
-        404: {"description": "Not found."},
-        422: {"description": "Bad parameters (skip or limit?)"},
-    },
     )
 
 
@@ -21,6 +17,11 @@ router = APIRouter(
     "/{key}/values",
     summary="Get list of tag values having specified tag key",
     dependencies=[Depends(paging_params)],
+    responses={
+        200: {"description": "Successful Response"},
+        404: {"description": "Not found."},
+        422: {"description": "Bad parameters (key or skip or limit?)"},
+    },
 )
 def tag_key_values_get(request: Request, key: str) -> List[str]:
     stmt = " ".join([
@@ -41,6 +42,11 @@ def tag_key_values_get(request: Request, key: str) -> List[str]:
     "/{key}/{value}/entities",
     summary="Get list of entities tagged by key:value",
     dependencies=[Depends(paging_params)],
+    responses={
+        200: {"description": "Successful Response"},
+        404: {"description": "Not found."},
+        422: {"description": "Bad parameters (key or value or skip or limit?)"},
+    },
 )
 def tag_key_value_entities_get(request: Request, key: str, value: str) -> List[Node | Property | Relationship | Term | Concept]:
     stmt = " ".join([
@@ -59,7 +65,11 @@ def tag_key_value_entities_get(request: Request, key: str, value: str) -> List[N
 
 @router.get(
     "/{key}/{value}/entities/count",
-    summary="Get number of entities tagged by key:value"
+    summary="Get number of entities tagged by key:value",
+    responses={
+        200: {"description": "Successful Response"},
+        422: {"description": "Bad parameters (key or value?)"},
+    },
 )
 def tag_key_value_entities_count_get(request: Request, key: str, value: str) -> int:
     stmt = 'MATCH (n1)-[r0:has_tag]->(n0:tag {key:$p0,value:$p1}) RETURN count(n1) as count'

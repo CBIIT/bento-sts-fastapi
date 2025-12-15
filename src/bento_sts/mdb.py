@@ -37,7 +37,7 @@ def read_txn(func):
             result = session.execute_read(txn_q)
             if len(result) == 0:
                 raise HTTPException(status_code=404,
-                                    detail="No records found.")
+                                    detail="Not found.")
             return result
     return rd
 

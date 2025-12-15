@@ -7,16 +7,17 @@ router = APIRouter(
     prefix="/terms",
     tags=["terms"],
     dependencies=[Depends(paging_params)],
-    responses={
-        404: {"description": "Not found."},
-        422: {"description": "Bad parameters (skip or limit?)"},
-    },
     )
 
 @router.get(
     "/model-pvs/{model}/{property:path}",
     summary="Get Permissible Values and Synonyms for a model, optionally filtered by property and version.",
-    response_model=List[CDEPermissibleValuesModel]
+    response_model=List[CDEPermissibleValuesModel],
+    responses={
+        200: {"description": "Successful Response"},
+        404: {"description": "Not found."},
+        422: {"description": "Bad parameters (model or property or version or skip or limit?)"},
+    },
 )
 def pvs_synonyms_model_version_get(request: Request, model: str, property: str = "", version: str | None = None):
     # If version is not provided, get the latest version for the model
@@ -92,7 +93,12 @@ def pvs_synonyms_model_version_get(request: Request, model: str, property: str =
 @router.get(
     "/cde-pvs/{id}/{version}/pvs",
     summary="Get PVs for a given CDE id and version.",
-    response_model=List[CDEPermissibleValues]
+    response_model=List[CDEPermissibleValues],
+    responses={
+        200: {"description": "Successful Response"},
+        404: {"description": "Not found."},
+        422: {"description": "Bad parameters (id or version or skip or limit?)"},
+    },
 )
 def cde_pvs_by_id_with_version_get(request: Request, id: str, version: str):
     stmt = """
