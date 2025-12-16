@@ -24,18 +24,21 @@ router = APIRouter(
     },
 )
 def models_get(request: Request) -> List[Model]:
-    stmt = " ".join(
-        ['MATCH (n0:model) RETURN n0 as model',
-         f"SKIP {request.state.skip} " if request.state.skip else "",
-         f"LIMIT {request.state.limit}" if request.state.limit else ""])
-    ret = []
     rows = request.state.mdb.get_with_statement(
-        stmt,
+        'MATCH (n0:model) RETURN n0 as model',
         {}
     )
-    for row in rows:
-        ret.append(neo_to_py(row['model']))
-    return sorted(ret, key=cmp_to_key(model_version_compare))
+    sorted_models = sorted(
+        (neo_to_py(row['model']) for row in rows),
+        key=cmp_to_key(model_version_compare)
+    )
+
+    skip = max(request.state.skip or 0, 0)
+    limit = request.state.limit
+    limit = limit if limit and limit > 0 else None
+
+    return (sorted_models[skip:skip + limit]
+            if limit is not None else sorted_models[skip:])
 
 
 @router.get(
