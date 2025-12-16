@@ -33,7 +33,7 @@ def models_get(request: Request) -> List[Model]:
         key=cmp_to_key(model_version_compare)
     )
 
-    skip = max(request.state.skip or 0, 0)
+    skip = request.state.skip or 0
     limit = request.state.limit
     limit = limit if limit and limit > 0 else None
 
