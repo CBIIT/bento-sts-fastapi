@@ -9,10 +9,7 @@ from ..utility.version_utils import model_version_compare
 router = APIRouter(
     prefix="/model",
     tags=["model"],
-    responses={
-        404: {"description": "Not found."},
-    },
-    )
+)
 
 PROPERTY_NOT_EXISTS = "Property exists, but does not use an acceptable value set."
 PROPERTY_ERROR_EXAMPLES = {
@@ -123,7 +120,11 @@ def model_model_handle_nodes_get(
 
 @router.get(
     "/{modelHandle}/version/{versionString}/nodes/count",
-    summary="Get number of nodes for specified model"
+    summary="Get number of nodes for specified model",
+    responses={
+        200: {"description": "Successful Response"},
+        422: {"description": "Bad parameters (modelHandle or versionString?)"},
+    },
 )
 def model_model_handle_nodes_count_get(request: Request, modelHandle: str, versionString: str) -> int:
     stmt = 'MATCH (n0:node {model:$p0,version:$p1}) RETURN count(n0) as count'
@@ -226,7 +227,9 @@ def model_model_handle_node_node_handle_property_prop_handle_get(
     summary="Get the terms (acceptable values) for specified property, if applicable to property.",
     dependencies=[Depends(paging_params)],
     responses={
-        422: {"description": PROPERTY_NOT_EXISTS}
+        200: {"description": "Successful Response"},
+        404: PROPERTY_ERROR_EXAMPLES,
+        422: {"description": "Bad parameters (modelHandle or versionString or nodeHandle or propHandle or skip or limit?)"},
     }
 )
 def model_model_handle_node_node_handle_property_prop_handle_terms_get(
@@ -249,7 +252,7 @@ def model_model_handle_node_node_handle_property_prop_handle_terms_get(
         if row['term'] is not None:
             has_terms = True
             ret.append(neo_to_py(row['term']))
-    
+
     # Property exists but has no terms
     if rows and not has_terms:
         raise HTTPException(
