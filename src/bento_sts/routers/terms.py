@@ -40,7 +40,7 @@ def pvs_synonyms_model_version_get(request: Request, model: str, property: str =
             models = [neo_to_py(row['model']) for row in result]
             version = sorted(models, key=cmp_to_key(model_version_compare))[-1].version
     
-    # Clean property: remove quotes and whitespace; Swagger doc requires to reqeust a value input.
+    # Clean property: remove quotes and whitespace; Swagger doc requires to request a value input.
     property = property.strip().strip('"').strip("'").strip()
     
     # Build parameters and query based on whether property is specified
