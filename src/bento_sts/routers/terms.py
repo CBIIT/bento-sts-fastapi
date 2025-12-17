@@ -1,7 +1,10 @@
 from fastapi import APIRouter, Depends, Request
 from typing import List
+from functools import cmp_to_key
 from ..dependencies import paging_params
 from ..pymodels import CDEPermissibleValuesModel, CDEPermissibleValues
+from ..converters import neo_to_py
+from ..utility.version_utils import model_version_compare
 
 router = APIRouter(
     prefix="/terms",
@@ -22,15 +25,20 @@ router = APIRouter(
 def pvs_synonyms_model_version_get(request: Request, model: str, property: str = "", version: str | None = None):
     # If version is not provided, get the latest version for the model
     if version is None or version.strip() == "":
-        latest_version_stmt = """
-        MATCH (m:model {handle:$p0, is_latest_version:true})
-        RETURN m.version AS version
-        """
-        result = request.state.mdb.get_with_statement(latest_version_stmt, {"p0": model})
+        # find a model with is_latest_version
+        stmt = "MATCH (m:model {handle:$p0, is_latest_version:true}) RETURN m AS model"
+        result = request.state.mdb.get_with_statement(stmt, {"p0": model}, raise_on_empty=False)
+        
         if result:
-            version = result[0].get("version")
+            # Found models with is_latest_version
+            models = [neo_to_py(row['model']) for row in result]
+            version = sorted(models, key=cmp_to_key(model_version_compare))[-1].version
         else:
-            return []
+            # get all versions and pick the latest version
+            stmt = "MATCH (m:model {handle:$p0}) RETURN m AS model"
+            result = request.state.mdb.get_with_statement(stmt, {"p0": model})
+            models = [neo_to_py(row['model']) for row in result]
+            version = sorted(models, key=cmp_to_key(model_version_compare))[-1].version
     
     # Clean property: remove quotes and whitespace; Swagger doc requires to reqeust a value input.
     property = property.strip().strip('"').strip("'").strip()

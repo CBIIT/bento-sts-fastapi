@@ -70,11 +70,25 @@ def model_model_versions_get(
 def model_model_latest_version_get(
         request: Request, modelHandle: str) -> Model:
     stmt = 'MATCH (n0:model {name:$p0}) where n0.is_latest_version return n0'
-    ret = request.state.mdb.get_with_statement(
+    res = request.state.mdb.get_with_statement(
+        stmt,
+        {"p0": modelHandle},
+        raise_on_empty=False
+    )
+    
+    if res:
+        # If we found models with is_latest_version, convert and return the highest
+        models = [neo_to_py(row['model']) for row in res]
+        return sorted(models, key=cmp_to_key(model_version_compare))[-1]
+    
+    # No model with is_latest_version found, fall back to getting all versions
+    stmt = 'MATCH (n0:model {name:$p0}) RETURN n0 as model'
+    res = request.state.mdb.get_with_statement(
         stmt,
         {"p0": modelHandle}
     )
-    return neo_to_py(ret[0]['n0'])
+    models = [neo_to_py(row['model']) for row in res]
+    return sorted(models, key=cmp_to_key(model_version_compare))[-1]
 
 
 @router.get(
@@ -106,11 +120,7 @@ def model_model_handle_nodes_get(
 
 @router.get(
     "/{modelHandle}/version/{versionString}/nodes/count",
-    summary="Get number of nodes for specified model",
-    responses={
-        200: {"description": "Successful Response"},
-        422: {"description": "Bad parameters (modelHandle or versionString?)"},
-    },
+    summary="Get number of nodes for specified model"
 )
 def model_model_handle_nodes_count_get(request: Request, modelHandle: str, versionString: str) -> int:
     stmt = 'MATCH (n0:node {model:$p0,version:$p1}) RETURN count(n0) as count'
@@ -213,9 +223,7 @@ def model_model_handle_node_node_handle_property_prop_handle_get(
     summary="Get the terms (acceptable values) for specified property, if applicable to property.",
     dependencies=[Depends(paging_params)],
     responses={
-        200: {"description": "Successful Response"},
-        404: PROPERTY_ERROR_EXAMPLES,
-        422: {"description": "Bad parameters (modelHandle or versionString or nodeHandle or propHandle or skip or limit?)"},
+        422: {"description": PROPERTY_NOT_EXISTS}
     }
 )
 def model_model_handle_node_node_handle_property_prop_handle_terms_get(
@@ -238,7 +246,7 @@ def model_model_handle_node_node_handle_property_prop_handle_terms_get(
         if row['term'] is not None:
             has_terms = True
             ret.append(neo_to_py(row['term']))
-
+    
     # Property exists but has no terms
     if rows and not has_terms:
         raise HTTPException(
