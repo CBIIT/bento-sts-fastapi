@@ -9,7 +9,10 @@ from ..utility.version_utils import model_version_compare
 router = APIRouter(
     prefix="/model",
     tags=["model"],
-)
+    responses={
+        404: {"description": "Not found."},
+    },
+    )
 
 PROPERTY_NOT_EXISTS = "Property exists, but does not use an acceptable value set."
 PROPERTY_ERROR_EXAMPLES = {
@@ -69,7 +72,7 @@ def model_model_versions_get(
 )
 def model_model_latest_version_get(
         request: Request, modelHandle: str) -> Model:
-    stmt = 'MATCH (n0:model {name:$p0}) where n0.is_latest_version return n0'
+    stmt = 'MATCH (n0:model {name:$p0}) where n0.is_latest_version return n0 AS model'
     res = request.state.mdb.get_with_statement(
         stmt,
         {"p0": modelHandle},
@@ -82,7 +85,7 @@ def model_model_latest_version_get(
         return sorted(models, key=cmp_to_key(model_version_compare))[-1]
     
     # No model with is_latest_version found, fall back to getting all versions
-    stmt = 'MATCH (n0:model {name:$p0}) RETURN n0 as model'
+    stmt = 'MATCH (n0:model {name:$p0}) RETURN n0 AS model'
     res = request.state.mdb.get_with_statement(
         stmt,
         {"p0": modelHandle}
