@@ -69,12 +69,26 @@ def model_model_versions_get(
 )
 def model_model_latest_version_get(
         request: Request, modelHandle: str) -> Model:
-    stmt = 'MATCH (n0:model {name:$p0}) where n0.is_latest_version return n0'
-    ret = request.state.mdb.get_with_statement(
+    stmt = 'MATCH (n0:model {name:$p0}) where n0.is_latest_version return n0 AS model'
+    res = request.state.mdb.get_with_statement(
+        stmt,
+        {"p0": modelHandle},
+        raise_on_empty=False
+    )
+    
+    if res:
+        # If we found models with is_latest_version, convert and return the highest
+        models = [neo_to_py(row['model']) for row in res]
+        return sorted(models, key=cmp_to_key(model_version_compare))[-1]
+    
+    # No model with is_latest_version found, fall back to getting all versions
+    stmt = 'MATCH (n0:model {name:$p0}) RETURN n0 AS model'
+    res = request.state.mdb.get_with_statement(
         stmt,
         {"p0": modelHandle}
     )
-    return neo_to_py(ret[0]['n0'])
+    models = [neo_to_py(row['model']) for row in res]
+    return sorted(models, key=cmp_to_key(model_version_compare))[-1]
 
 
 @router.get(
