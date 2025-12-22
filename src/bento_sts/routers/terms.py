@@ -22,7 +22,7 @@ router = APIRouter(
         422: {"description": "Bad parameters (model or property or version or skip or limit?)"},
     },
 )
-def pvs_synonyms_model_version_get(request: Request, model: str, property: str = "", version: str | None = None):
+def pvs_synonyms_model_version_get(request: Request, model: str, property: str = "", version: str | None = None, use_null_cde: bool | None = None):
     # If version is not provided, get the latest version for the model
     if version is None or version.strip() == "":
         # find a model with is_latest_version
@@ -46,33 +46,68 @@ def pvs_synonyms_model_version_get(request: Request, model: str, property: str =
     # Build parameters and query based on whether property is specified
     has_property = property and property != ""
     params = {"p0": model, "p1": version, "p3": request.state.skip, "p4": request.state.limit} | ({"p2": property} if has_property else {})
+    NULL_CDE_ID = '16476366|1'
+    USE_NULL_CDE_TAG = 'useNullCDE'
     
-    stmt = """
-    MATCH (n0:node {model:$p0})-[r0:has_property]->(n1:property)
+    # Determine if we should include NULL CDE logic
+    include_null_cde = use_null_cde is None or use_null_cde is True
+
+    # noinspection SqlDialectInspection,SqlNoDataSourceInspection
+    use_null = "true" if include_null_cde else "false"
+    stmt = f"""
+    // Start with the model node and get the property (or all properties if not specified)
+    MATCH (n0:node {{model:$p0}})-[r0:has_property]->(n1:property)
     WITH n1 AS prop
-    WHERE n0.version = $p1""" + (" AND prop.handle = $p2" if has_property else "") + """
+    WHERE n0.version = $p1""" + (" AND prop.handle = $p2" if has_property else "") + f"""
+    // Get the CDE term associated with the property (if any)
     OPTIONAL MATCH (prop)-[:has_concept]->(c:concept)<-[:represents]-(cde:term)
       WHERE toLower(cde.origin_name) CONTAINS "cadsr"
-    OPTIONAL MATCH (prop)-[:has_value_set]->(:value_set)-[:has_term]->(t:term)
-    WITH prop, cde.origin_id AS CDECode, cde.origin_version AS CDEVersion,
+    // Check if the property has the useNullCDE tag
+    OPTIONAL MATCH (prop)-[:has_tag]->(use_null_tag:tag {{key: "{USE_NULL_CDE_TAG}"}})
+    // Create CDE metadata and flag indicating if null CDE should be included for this property
+    WITH prop, cde, use_null_tag, cde.origin_id AS CDECode, cde.origin_version AS CDEVersion,
       cde.value AS CDEFullName,
       cde.origin_id + "|" + COALESCE(cde.origin_version, "") AS cde_hdl,
-      collect(t) AS model_pvs,
-      CASE WHEN cde IS NOT NULL THEN true ELSE false END AS has_cde
-    OPTIONAL MATCH (v:value_set {handle: cde_hdl})-[:has_term]->(cde_pv:term)
-    WITH prop, CDECode, CDEVersion, CDEFullName, model_pvs, has_cde,
-      collect(cde_pv) AS cde_pvs WITH prop, CDECode, CDEVersion, CDEFullName,
-      model_pvs, has_cde, cde_pvs,
-      CASE WHEN has_cde AND size(cde_pvs) > 0 AND
-        NONE(p in cde_pvs WHERE p.value =~ "https?://.*")
-        THEN cde_pvs WHEN has_cde and size(cde_pvs) > 0 AND
-        ANY(p in cde_pvs WHERE p.value =~ "https?://.*") AND
-        size(model_pvs) > 0
-        THEN model_pvs WHEN NOT has_cde AND size(model_pvs) > 0
-        THEN model_pvs ELSE [null] END AS pvs
+      CASE WHEN cde IS NOT NULL THEN true ELSE false END AS has_cde,
+      ANY(ut IN COLLECT(use_null_tag) WHERE ut.value IN ["Yes", "True", "true"] OR ut.value = true) AS should_use_null_cde
+    // Get PVs defined in the MDF model for this property
+    OPTIONAL MATCH (prop)-[:has_value_set]->(:value_set)-[:has_term]->(model_pv:term)
+    WITH prop, cde, CDECode, CDEVersion, CDEFullName, cde_hdl, has_cde, should_use_null_cde,
+      collect(DISTINCT model_pv) AS model_pvs
+    // Get the CDE's official PVs from the value set
+    OPTIONAL MATCH (v:value_set {{handle: cde_hdl}})-[:has_term]->(cde_pv:term)
+    WITH prop, CDECode, CDEVersion, CDEFullName, model_pvs, has_cde, should_use_null_cde,
+      collect(cde_pv) AS cde_pvs
+    // Get the null CDE PVs if enabled and should_use_null_cde is true
+    OPTIONAL MATCH (null_vs:value_set {{handle: "{NULL_CDE_ID}"}})-[:has_term]->(null_pv:term)
+    WITH prop, CDECode, CDEVersion, CDEFullName, model_pvs, cde_pvs, has_cde, should_use_null_cde,
+      CASE WHEN {use_null} AND should_use_null_cde THEN COLLECT(DISTINCT null_pv) ELSE [] END AS null_pvs
+    // Determine which PV set to use based on availability and content
+    WITH prop, CDECode, CDEVersion, CDEFullName, model_pvs, cde_pvs, null_pvs, has_cde,
+      CASE 
+        // When there are cde_pvs for property and there are no URLs in the pv list, return cde and null pvs
+        WHEN has_cde AND size(cde_pvs) > 0 AND NONE(p in cde_pvs WHERE p.value =~ "https?://.*")
+          THEN cde_pvs + null_pvs
+        // When the "value set" of the CDE is just a url ("values by reference"), return the model's defined enum as the pvs
+        WHEN has_cde and size(cde_pvs) > 0 AND ANY(p in cde_pvs WHERE p.value =~ "https?://.*") AND size(model_pvs) > 0
+          THEN model_pvs + null_pvs
+        // When CDE exists but only null_pvs are available
+        WHEN has_cde and SIZE(null_pvs) > 0
+          THEN null_pvs
+        // When there's no CDE but model has pvs
+        WHEN NOT has_cde AND size(model_pvs) > 0
+          THEN model_pvs + null_pvs
+        // When only null_pvs are available
+        WHEN SIZE(null_pvs) > 0
+          THEN null_pvs
+        ELSE [null] 
+      END AS pvs
+    WHERE size(pvs) > 0
     UNWIND pvs AS pv
-    OPTIONAL MATCH (pv)-[:represents]->(c_cadsr:concept)<-[:represents]-(ncit_term:term {origin_name: "NCIt"}), (c_cadsr)-[:has_tag]->(:tag {key: "mapping_source", value: "caDSR"})
-    OPTIONAL MATCH (ncit_term)-[:represents]->(c_ncim:concept)<-[:represents]-(syn:term), (c_ncim)-[:has_tag]->(:tag {key: "mapping_source", value: "NCIm"})
+    // For each PV, obtain the NCIt term associated with it according to caDSR
+    OPTIONAL MATCH (pv)-[:represents]->(c_cadsr:concept)<-[:represents]-(ncit_term:term {{origin_name: "NCIt"}}), (c_cadsr)-[:has_tag]->(:tag {{key: "mapping_source", value: "caDSR"}})
+    // Find any synonyms associated with the NCIt term in the NCI Metathesaurus data
+    OPTIONAL MATCH (ncit_term)-[:represents]->(c_ncim:concept)<-[:represents]-(syn:term), (c_ncim)-[:has_tag]->(:tag {{key: "mapping_source", value: "NCIm"}})
       WHERE pv <> syn and pv.value <> syn.value
     WITH prop, CDECode, CDEVersion, CDEFullName, model_pvs, pv.value AS pv_val,
       ncit_term.origin_id AS ncit_oid, ncit_term.value AS ncit_value,
@@ -81,8 +116,10 @@ def pvs_synonyms_model_version_get(request: Request, model: str, property: str =
       CASE WHEN ncit_value IS NOT NULL
         THEN distinct_syn_vals + [ncit_value]
         ELSE distinct_syn_vals END AS syn_vals
+    // Format the PVs with their synonyms and NCIt codes
     WITH prop, CDECode, CDEVersion, CDEFullName, model_pvs,
-    [pv_item IN collect({value: pv_val, synonyms: syn_vals, ncit_concept_code: ncit_oid}) WHERE pv_item.value IS NOT NULL] AS formatted_pvs
+    [pv_item IN collect({{value: pv_val, synonyms: syn_vals, ncit_concept_code: ncit_oid}}) WHERE pv_item.value IS NOT NULL] AS formatted_pvs
+    // Return the results with pagination support
     RETURN DISTINCT $p0 AS model, $p1 AS version,
       prop.handle AS property,
       CASE 
@@ -108,27 +145,57 @@ def pvs_synonyms_model_version_get(request: Request, model: str, property: str =
         422: {"description": "Bad parameters (id or version or skip or limit?)"},
     },
 )
-def cde_pvs_by_id_with_version_get(request: Request, id: str, version: str):
-    stmt = """
-    MATCH (n0:term {origin_id: $p0 })
+def cde_pvs_by_id_with_version_get(request: Request, id: str, version: str, use_null_cde: bool | None = None):
+    NULL_CDE_ID = '16476366|1'
+    USE_NULL_CDE_TAG = 'useNullCDE'
+    
+    # Determine if we should include NULL CDE logic
+    include_null_cde = use_null_cde is None or use_null_cde is True
+
+    # noinspection SqlDialectInspection,SqlNoDataSourceInspection
+    use_null = "true" if include_null_cde else "false"
+    stmt = f"""
+    // Start with the CDE term by origin_id and optionally version
+    MATCH (n0:term {{origin_id: $p0 }})
       WHERE $p1 = "none" OR n0.origin_version = $p1
+    // Get all properties that are annotated with this CDE
+    OPTIONAL MATCH (prop:property)-[:has_concept]->(:concept)<-[:represents]-(n0)
+    // Check if any property has the useNullCDE tag
+    OPTIONAL MATCH (prop)-[:has_tag]->(use_null_tag:tag {{key: "{USE_NULL_CDE_TAG}"}})
+    WITH n0, COLLECT(DISTINCT use_null_tag.value) AS tag_values
+    // Determine if null CDE should be included based on the tag values across all properties
+    WITH n0, ANY(val IN tag_values WHERE val IN ["Yes", "True", "true"]) AS should_use_null_cde
+    // Get the CDE's official PVs from the value set
     OPTIONAL MATCH (vs:value_set)-[:has_term]->(pv:term)
       WHERE vs.handle = $p0 + '|' + coalesce(n0.origin_version, "")
-    WITH n0, vs.url as value_set_url, COLLECT(pv) as pvs WITH n0,
-      value_set_url, pvs,
-      CASE WHEN size(pvs) > 0 THEN pvs ELSE [null] END as pvs_to_process
+    WITH n0, vs.url as value_set_url, COLLECT(pv) as pvs, should_use_null_cde
+    // Get the null CDE PVs if enabled and should_use_null_cde is true
+    OPTIONAL MATCH (null_vs:value_set {{handle: "{NULL_CDE_ID}"}})-[:has_term]->(null_pv:term)
+    WITH n0, value_set_url, pvs, should_use_null_cde,
+      CASE WHEN {use_null} AND should_use_null_cde THEN COLLECT(DISTINCT null_pv) ELSE [] END AS null_pvs
+    // Determine which PV set to use: CDE PVs + null PVs, or just null PVs if no CDE PVs exist
+    WITH n0, value_set_url, pvs, null_pvs,
+      CASE 
+        WHEN size(pvs) > 0 THEN pvs + null_pvs
+        WHEN SIZE(null_pvs) > 0 THEN null_pvs
+        ELSE [null] 
+      END as pvs_to_process
     UNWIND pvs_to_process AS pv
-    OPTIONAL MATCH (pv)-[:represents]->(c_cadsr:concept)<-[:represents]-(ncit_term:term {origin_name: "NCIt"}), (c_cadsr)-[:has_tag]->(:tag {key: "mapping_source", value: "caDSR"})
+    // For each PV, obtain the NCIt term associated with it according to caDSR
+    OPTIONAL MATCH (pv)-[:represents]->(c_cadsr:concept)<-[:represents]-(ncit_term:term {{origin_name: "NCIt"}}), (c_cadsr)-[:has_tag]->(:tag {{key: "mapping_source", value: "caDSR"}})
       WHERE pv IS NOT NULL
-    OPTIONAL MATCH (ncit_term)-[:represents]->(c_ncim:concept)<-[:represents]-(syn:term), (c_ncim)-[:has_tag]->(:tag {key: "mapping_source", value: "NCIm"})
+    // Find any synonyms associated with the NCIt term in the NCI Metathesaurus data
+    OPTIONAL MATCH (ncit_term)-[:represents]->(c_ncim:concept)<-[:represents]-(syn:term), (c_ncim)-[:has_tag]->(:tag {{key: "mapping_source", value: "NCIm"}})
       WHERE pv IS NOT NULL AND pv <> syn and pv.value <> syn.value
     WITH n0, value_set_url, pvs,
       CASE WHEN pv IS NULL THEN null ELSE pv.value END as pv_val,
       CASE WHEN pv IS NULL THEN null ELSE ncit_term.origin_id END AS ncit_oid,
       CASE WHEN pv IS NULL THEN null ELSE ncit_term.value END AS ncit_value,
       collect(DISTINCT syn.value) AS distinct_syn_vals
+    // Format the PVs with their synonyms and NCIt codes
     WITH n0, value_set_url, pvs,
-      CASE WHEN pv_val IS NULL THEN [] ELSE collect({value: pv_val, synonyms: CASE WHEN ncit_value IS NOT NULL THEN distinct_syn_vals + [ncit_value] ELSE distinct_syn_vals END, ncit_concept_code: ncit_oid}) END AS permissibleValues
+      CASE WHEN pv_val IS NULL THEN [] ELSE collect({{value: pv_val, synonyms: CASE WHEN ncit_value IS NOT NULL THEN distinct_syn_vals + [ncit_value] ELSE distinct_syn_vals END, ncit_concept_code: ncit_oid}}) END AS permissibleValues
+    // Return the CDE information with pagination support
     WITH n0.origin_id AS CDECode, n0.origin_version AS CDEVersion,
       n0.value AS CDEFullName, 
       CASE 
