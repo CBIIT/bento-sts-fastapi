@@ -60,7 +60,6 @@ def model_model_versions_get(
 @router.get(
     "/{modelHandle}/latest-version",
     summary="Get latest version of specified model",
-    dependencies=[Depends(paging_params)],
     responses={
         200: {"description": "Successful Response"},
         404: {"description": "Not found."},
