@@ -39,7 +39,7 @@ def tag_key_values_get(request: Request, key: str) -> List[str]:
     
 
 @router.get(
-    "/{key}/{value}/entities",
+    "/{key}/{value:path}/entities",
     summary="Get list of entities tagged by key:value",
     dependencies=[Depends(paging_params)],
     responses={
@@ -64,7 +64,7 @@ def tag_key_value_entities_get(request: Request, key: str, value: str) -> List[N
 
 
 @router.get(
-    "/{key}/{value}/entities/count",
+    "/{key}/{value:path}/entities/count",
     summary="Get number of entities tagged by key:value",
     responses={
         200: {"description": "Successful Response"},
