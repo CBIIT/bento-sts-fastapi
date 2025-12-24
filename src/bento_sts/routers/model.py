@@ -264,7 +264,7 @@ def model_model_handle_node_node_handle_property_prop_handle_terms_get(
 
 @router.get(
     "/{modelHandle}/version/{versionString}/node/{nodeHandle}/property/{propHandle}/terms/count",
-    summary="Get number of  properties for specified node",
+    summary="Get number of terms for specified property",
     responses={
         200: {"description": "Successful Response"},
         404: {"description": PROPERTY_NOT_EXISTS},
