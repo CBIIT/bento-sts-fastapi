@@ -1,8 +1,8 @@
 null_pvs = {'Not Assessed', 'Not Asked', 'Temporarily Unavailable', 'Insufficient Quantity', 'Technical Problem', 'Response Declined', 'Not Specified', 'Unknown', 'Not Evaluable', 'Not Reported', 'Not Otherwise Specified', 'Not Applicable', 'Not Allowed To Collect', 'Censored'}
 
 def test_model_pvs_with_nullCDE(test_sts_client):
-    # Test pvs_synonyms_model_version_get endpoint with library_layout property that has useNullCDE tag
-    response = test_sts_client.get("/v2/terms/model-pvs/CDS/library_layout?skip=0&limit=0&use_null_cde=true")
+    # Test property with useNullCDE tag (library_layout should have the tag)
+    response = test_sts_client.get("/v2/terms/model-pvs/CDS/library_layout?skip=0&limit=0")
     assert response.status_code == 200
     content = response.json()
     assert len(content) > 0
@@ -11,58 +11,50 @@ def test_model_pvs_with_nullCDE(test_sts_client):
     assert content[0]['property'] == 'library_layout', f"Expected property 'library_layout', got {content[0]['property']}"
     assert content[0]['model'] == 'CDS', f"Expected model 'CDS', got {content[0]['model']}"
     
-    # Get the PV values
+    # Get the PV values - should include null CDE PVs if the property has the useNullCDE tag
     pvs_for_library_layout = [pv['value'] for pv in content[0]['permissibleValues']]
-    count_with_null = len(pvs_for_library_layout)
     
-    # Test without null CDE
-    response_no_null = test_sts_client.get("/v2/terms/model-pvs/CDS/library_layout?skip=0&limit=0&use_null_cde=false")
-    assert response_no_null.status_code == 200
-    content_no_null = response_no_null.json()
-    pvs_no_null = [pv['value'] for pv in content_no_null[0]['permissibleValues']]
-    count_without_null = len(pvs_no_null)
-    
-    # With NULL CDE should have at least as many PVs as without
-    assert count_with_null >= count_without_null, f"Expected at least as many PVs with null CDE ({count_with_null}) as without ({count_without_null})"
-    
-    # If NULL CDE data exists in test env (count is higher when use_null_cde=true)
-    if count_with_null > count_without_null:
-        # Check that null_pvs (NULL CDE values) are actually included
-        null_pvs_found = null_pvs & set(pvs_for_library_layout)
-        assert len(null_pvs_found) > 0, f"Expected NULL CDE values to be included when count increased. NULL PVs found: {null_pvs_found}, All PVs: {pvs_for_library_layout}"
-        
+    # If NULL CDE data exists in test env and the property has useNullCDE tag
+    # Check that null_pvs (NULL CDE values) are actually included
+    null_pvs_found = null_pvs & set(pvs_for_library_layout)
+    if len(null_pvs_found) > 0:
         # Check that all null_pvs are in the pvs returned for library layout
         assert null_pvs < set(pvs_for_library_layout), f"Expected all NULL PVs to be included."
         
         # Check that the model-specified values are also returned
         assert set(["Paired-End", "Single-indexed"]) < set(pvs_for_library_layout), f"Expected model values in: {pvs_for_library_layout}"
-        
-        # Verify NULL PVs are NOT in the response when use_null_cde=false
-        null_pvs_in_no_null = null_pvs & set(pvs_no_null)
-        assert len(null_pvs_in_no_null) == 0, f"Expected NO NULL PVs when use_null_cde=false, but found: {null_pvs_in_no_null}"
 
 def test_cde_pvs_with_nullCDE(test_sts_client):
-    # Test cde_pvs_by_id_with_version_get endpoint with a CDE that has useNullCDE tag
+    # Test with use_null_cde=true (should include null CDE PVs regardless of property tags)
     response = test_sts_client.get("/v2/terms/cde-pvs/15235975/1.00/pvs?use_null_cde=true")
     assert response.status_code == 200
     content = response.json()
     assert len(content) > 0
     # Get the PV values
-    pvs = [pv['value'] for pv in content[0]['permissibleValues']]
-    count_with_null = len(pvs)
+    pvs_with_flag = [pv['value'] for pv in content[0]['permissibleValues']]
     
-    # Test without null CDE
-    response_no_null = test_sts_client.get("/v2/terms/cde-pvs/15235975/1.00/pvs?use_null_cde=false")
-    assert response_no_null.status_code == 200
-    content_no_null = response_no_null.json()
-    pvs_no_null = [pv['value'] for pv in content_no_null[0]['permissibleValues']]
-    count_without_null = len(pvs_no_null)
+    # Test without flag (use_null_cde=false, should NOT include null CDE PVs)
+    response_no_flag = test_sts_client.get("/v2/terms/cde-pvs/15235975/1.00/pvs?use_null_cde=false")
+    assert response_no_flag.status_code == 200
+    content_no_flag = response_no_flag.json()
+    pvs_no_flag = [pv['value'] for pv in content_no_flag[0]['permissibleValues']]
     
-    # With NULL CDE should have at least as many PVs as without
-    assert count_with_null >= count_without_null, f"Expected at least as many PVs with null CDE ({count_with_null}) as without ({count_without_null})"
+    # Test default behavior (no parameter, defaults to use_null_cde=false)
+    response_default = test_sts_client.get("/v2/terms/cde-pvs/15235975/1.00/pvs")
+    assert response_default.status_code == 200
+    content_default = response_default.json()
+    pvs_default = [pv['value'] for pv in content_default[0]['permissibleValues']]
+    assert set(pvs_default) == set(pvs_no_flag), "Default behavior should be the same as use_null_cde=false"
+    
+    # With flag should have at least as many PVs as without flag
+    assert len(pvs_with_flag) >= len(pvs_no_flag), f"Expected at least as many PVs with flag ({len(pvs_with_flag)}) as without ({len(pvs_no_flag)})"
     
     # If NULL CDE data exists in test env (count is higher when use_null_cde=true)
-    if count_with_null > count_without_null:
-        # The difference should be in null_pvs
-        added_pvs = set(pvs) - set(pvs_no_null)
+    if len(pvs_with_flag) > len(pvs_no_flag):
+        # The difference should be null_pvs
+        added_pvs = set(pvs_with_flag) - set(pvs_no_flag)
         assert len(added_pvs & null_pvs) > 0, f"Expected added PVs to be NULL CDE values. Added: {added_pvs}, NULL PVs: {null_pvs}"
+        
+        # Verify that null PVs are NOT in the default response (standardized behavior)
+        null_pvs_in_default = null_pvs & set(pvs_default)
+        assert len(null_pvs_in_default) == 0, f"Default response should NOT include null CDE PVs. Found: {null_pvs_in_default}"

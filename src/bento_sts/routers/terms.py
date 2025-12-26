@@ -22,7 +22,7 @@ router = APIRouter(
         422: {"description": "Bad parameters (model or property or version or skip or limit?)"},
     },
 )
-def pvs_synonyms_model_version_get(request: Request, model: str, property: str = "", version: str | None = None, use_null_cde: bool | None = None):
+def pvs_synonyms_model_version_get(request: Request, model: str, property: str = "", version: str | None = None):
     # If version is not provided, get the latest version for the model
     if version is None or version.strip() == "":
         # find a model with is_latest_version
@@ -48,12 +48,8 @@ def pvs_synonyms_model_version_get(request: Request, model: str, property: str =
     params = {"p0": model, "p1": version, "p3": request.state.skip, "p4": request.state.limit} | ({"p2": property} if has_property else {})
     NULL_CDE_ID = '16476366|1'
     USE_NULL_CDE_TAG = 'useNullCDE'
-    
-    # Determine if we should include NULL CDE logic
-    include_null_cde = use_null_cde is None or use_null_cde is True
 
     # noinspection SqlDialectInspection,SqlNoDataSourceInspection
-    use_null = "true" if include_null_cde else "false"
     stmt = f"""
     // Start with the model node and get the property (or all properties if not specified)
     MATCH (n0:node {{model:$p0}})-[r0:has_property]->(n1:property)
@@ -78,10 +74,10 @@ def pvs_synonyms_model_version_get(request: Request, model: str, property: str =
     OPTIONAL MATCH (v:value_set {{handle: cde_hdl}})-[:has_term]->(cde_pv:term)
     WITH prop, CDECode, CDEVersion, CDEFullName, model_pvs, has_cde, should_use_null_cde,
       collect(cde_pv) AS cde_pvs
-    // Get the null CDE PVs if enabled and should_use_null_cde is true
+    // Use the property's tag to determine null_cde
     OPTIONAL MATCH (null_vs:value_set {{handle: "{NULL_CDE_ID}"}})-[:has_term]->(null_pv:term)
     WITH prop, CDECode, CDEVersion, CDEFullName, model_pvs, cde_pvs, has_cde, should_use_null_cde,
-      CASE WHEN {use_null} AND should_use_null_cde THEN COLLECT(DISTINCT null_pv) ELSE [] END AS null_pvs
+      CASE WHEN should_use_null_cde THEN COLLECT(DISTINCT null_pv) ELSE [] END AS null_pvs
     // Determine which PV set to use based on availability and content
     WITH prop, CDECode, CDEVersion, CDEFullName, model_pvs, cde_pvs, null_pvs, has_cde,
       CASE 
@@ -145,35 +141,24 @@ def pvs_synonyms_model_version_get(request: Request, model: str, property: str =
         422: {"description": "Bad parameters (id or version or skip or limit?)"},
     },
 )
-def cde_pvs_by_id_with_version_get(request: Request, id: str, version: str, use_null_cde: bool | None = None):
+def cde_pvs_by_id_with_version_get(request: Request, id: str, version: str, use_null_cde: bool = False):
     NULL_CDE_ID = '16476366|1'
-    USE_NULL_CDE_TAG = 'useNullCDE'
-    
-    # Determine if we should include NULL CDE logic
-    include_null_cde = use_null_cde is None or use_null_cde is True
 
     # noinspection SqlDialectInspection,SqlNoDataSourceInspection
-    use_null = "true" if include_null_cde else "false"
+    use_null = "true" if use_null_cde else "false"
     stmt = f"""
     // Start with the CDE term by origin_id and optionally version
     MATCH (n0:term {{origin_id: $p0 }})
       WHERE $p1 = "none" OR n0.origin_version = $p1
-    // Get all properties that are annotated with this CDE
-    OPTIONAL MATCH (prop:property)-[:has_concept]->(:concept)<-[:represents]-(n0)
-    // Check if any property has the useNullCDE tag
-    OPTIONAL MATCH (prop)-[:has_tag]->(use_null_tag:tag {{key: "{USE_NULL_CDE_TAG}"}})
-    WITH n0, COLLECT(DISTINCT use_null_tag.value) AS tag_values
-    // Determine if null CDE should be included based on the tag values across all properties
-    WITH n0, ANY(val IN tag_values WHERE val IN ["Yes", "True", "true"]) AS should_use_null_cde
     // Get the CDE's official PVs from the value set
     OPTIONAL MATCH (vs:value_set)-[:has_term]->(pv:term)
       WHERE vs.handle = $p0 + '|' + coalesce(n0.origin_version, "")
-    WITH n0, vs.url as value_set_url, COLLECT(pv) as pvs, should_use_null_cde
-    // Get the null CDE PVs if enabled and should_use_null_cde is true
+    WITH n0, vs.url as value_set_url, COLLECT(pv) as pvs
+    // Get the null CDE PVs only if use_null_cde flag is true
     OPTIONAL MATCH (null_vs:value_set {{handle: "{NULL_CDE_ID}"}})-[:has_term]->(null_pv:term)
-    WITH n0, value_set_url, pvs, should_use_null_cde,
-      CASE WHEN {use_null} AND should_use_null_cde THEN COLLECT(DISTINCT null_pv) ELSE [] END AS null_pvs
-    // Determine which PV set to use: CDE PVs + null PVs, or just null PVs if no CDE PVs exist
+    WITH n0, value_set_url, pvs,
+      CASE WHEN {use_null} THEN COLLECT(DISTINCT null_pv) ELSE [] END AS null_pvs
+    // Combine CDE PVs with null PVs if flag is set, otherwise just CDE PVs
     WITH n0, value_set_url, pvs, null_pvs,
       CASE 
         WHEN size(pvs) > 0 THEN pvs + null_pvs
