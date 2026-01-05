@@ -42,10 +42,7 @@ PROPERTY_ERROR_EXAMPLES = {
 )
 def model_model_versions_get(
         request: Request, modelHandle: str) -> List[str]:
-    stmt = " ".join([
-        'MATCH (n0:model {name:$p0}) return n0 as model',
-        f"SKIP {request.state.skip} " if request.state.skip else "",
-        f"LIMIT {request.state.limit}" if request.state.limit else ""])
+    stmt = 'MATCH (n0:model {name:$p0}) return n0 as model'
     rows = request.state.mdb.get_with_statement(
         stmt,
         {"p0": modelHandle}
@@ -53,8 +50,19 @@ def model_model_versions_get(
     ret = []
     for row in rows:
         ret.append(neo_to_py(row['model']))
+
+    sorted_models = sorted(ret, key=cmp_to_key(model_version_compare))
     
-    return [x.version for x in sorted(ret, key=cmp_to_key(model_version_compare))]
+    # Apply skip and limit after sorting
+    skip = request.state.skip if request.state.skip else 0
+    limit = request.state.limit if request.state.limit else None
+    
+    if limit:
+        sorted_models = sorted_models[skip:skip + limit]
+    elif skip:
+        sorted_models = sorted_models[skip:]
+    
+    return [x.version for x in sorted_models]
 
 
 @router.get(
