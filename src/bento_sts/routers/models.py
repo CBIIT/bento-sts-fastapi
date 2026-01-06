@@ -39,7 +39,7 @@ def models_get(request: Request) -> List[Model]:
 
     result = (sorted_models[skip:skip + limit]
               if limit is not None else sorted_models[skip:])
-    # Errors are handled here because skip and limit can't be managed in code.
+    # skip and limit are handled upstream; here we return 404 when the result set is empty.
     if not result:
         raise HTTPException(status_code=404, detail="Not found.")
     
