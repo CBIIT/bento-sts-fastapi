@@ -62,7 +62,12 @@ def model_model_versions_get(
     elif skip:
         sorted_models = sorted_models[skip:]
 
-    return [x.version for x in sorted_models]
+    result = [x.version for x in sorted_models]
+    # Errors are handled here because skip and limit can't be managed in code.
+    if not result:
+        raise HTTPException(status_code=404, detail="Not found.")
+    
+    return result
 
 
 @router.get(
