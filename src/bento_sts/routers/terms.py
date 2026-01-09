@@ -123,7 +123,7 @@ def pvs_synonyms_model_version_get(request: Request, model: str, property: str =
       [pv_item IN collect({{value: pv_val, synonyms: syn_vals, ncit_concept_code: ncit_oid}}) WHERE pv_item.value IS NOT NULL] AS formatted_pvs
     // Add alternate values as separate items
     WITH prop, CDECode, CDEVersion, CDEFullName, formatted_pvs, alternate_values,
-      [alt_val IN alternate_values | {{value: alt_val, ncit_concept_code: null, synonyms: null}}] AS formatted_alts
+      [alt_val IN alternate_values | {{value: alt_val, synonyms: []}}] AS formatted_alts
     // Combine and remove duplicates by value
     WITH prop, CDECode, CDEVersion, CDEFullName, formatted_pvs + formatted_alts AS all_pvs_raw
     UNWIND all_pvs_raw AS pv_item
@@ -203,7 +203,7 @@ def cde_pvs_by_id_with_version_get(request: Request, id: str, version: str, use_
       CASE WHEN pv_val IS NULL THEN [] ELSE collect({{value: pv_val, synonyms: CASE WHEN ncit_value IS NOT NULL THEN distinct_syn_vals + [ncit_value] ELSE distinct_syn_vals END, ncit_concept_code: ncit_oid}}) END AS permissibleValues
     // Add alternate values as separate items
     WITH n0, permissibleValues, alternate_values,
-      [alt_val IN alternate_values | {{value: alt_val}}] AS formatted_alts
+      [alt_val IN alternate_values | {{value: alt_val, synonyms: []}}] AS formatted_alts
     // Combine and remove duplicates by value
     WITH n0, permissibleValues + formatted_alts AS all_pvs_raw
     UNWIND all_pvs_raw AS pv_item
