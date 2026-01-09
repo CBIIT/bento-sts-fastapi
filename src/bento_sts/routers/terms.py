@@ -115,7 +115,7 @@ def pvs_synonyms_model_version_get(request: Request, model: str, property: str =
     // Format the PVs with their synonyms and NCIt codes
     WITH prop, CDECode, CDEVersion, CDEFullName, model_pvs, null_pvs, alternate_values,
       [pv_item IN collect({{value: pv_val, synonyms: syn_vals, ncit_concept_code: ncit_oid}}) WHERE pv_item.value IS NOT NULL] AS formatted_pvs
-    // Extract regular PV values for duplicate pvs
+    // Extract regular PV values for deduplication
     WITH prop, CDECode, CDEVersion, CDEFullName, formatted_pvs,
       [pv IN formatted_pvs | pv.value] AS regular_pv_values,
       [n IN null_pvs | n.value] AS null_cde_pvs,
@@ -196,7 +196,7 @@ def cde_pvs_by_id_with_version_get(request: Request, id: str, version: str, use_
     // Format the PVs with their synonyms and NCIt codes
     WITH n0, value_set_url, null_pvs, alternate_values,
       CASE WHEN pv_val IS NULL THEN [] ELSE collect({{value: pv_val, synonyms: CASE WHEN ncit_value IS NOT NULL THEN distinct_syn_vals + [ncit_value] ELSE distinct_syn_vals END, ncit_concept_code: ncit_oid}}) END AS permissibleValues
-    // Extract regular PV values for the duplicate PVs
+    // Extract regular PV values for the deduplication
     WITH n0, permissibleValues,
       [pv IN permissibleValues | pv.value] AS regular_pv_values,
       [n IN null_pvs | n.value] AS null_cde_pvs,
