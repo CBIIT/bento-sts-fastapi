@@ -311,7 +311,7 @@ def model_model_handle_node_node_handle_property_prop_handle_terms_count_get(req
 def model_model_handle_node_node_handle_property_prop_handle_term_term_value_get(
         request: Request,
         modelHandle: str, versionString: str,
-        nodeHandle: str, propHandle: str, termValue: str) -> Term:
+        nodeHandle: str, propHandle: str, termValue: str) -> List[Term]:
     stmt = " ".join([
         'MATCH (n0:node {model:$p0,version:$p1,handle:$p2})-[r0:has_property]->(n1:property {handle:$p3})',
         '-[r1:has_value_set]->(n3:value_set)-[r2:has_term]->(n2:term {value:$p4})',
@@ -321,4 +321,7 @@ def model_model_handle_node_node_handle_property_prop_handle_term_term_value_get
         stmt,
         {"p0": modelHandle, "p1": versionString, "p2": nodeHandle, "p3": propHandle, "p4": termValue}
     )
-    return neo_to_py(rows[0]['term'])
+    ret = []
+    for row in rows:
+        ret.append(neo_to_py(row['term']))
+    return ret
