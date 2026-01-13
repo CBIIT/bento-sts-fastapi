@@ -215,7 +215,7 @@ def cde_pvs_by_id_with_version_get(request: Request, id: str, version: str, use_
         WHEN $p2 > 0 THEN all_pvs[$p2..]
         ELSE all_pvs
       END AS permissibleValues
-    RETURN CDECode, CDEVersion, CDEFullName, permissibleValues"""
+    RETURN distinct CDECode, CDEVersion, CDEFullName, permissibleValues"""
     ret = request.state.mdb.get_with_statement(
         stmt,
         {"p0": id, "p1": version, "p2": request.state.skip, "p3": request.state.limit}
