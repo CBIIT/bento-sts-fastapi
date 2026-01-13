@@ -212,20 +212,18 @@ class TestModelRouter:
         assert isinstance(response.json(), int)
     
     def test_model_node_property_term_get(self, test_sts_client):
-        # First get terms to find a valid term value
-        terms_response = test_sts_client.get("/v2/model/CTDC/version/1.7.0/node/diagnosis"
-                                             "/property/meddra_disease_code/terms")
-        if terms_response.status_code == 200 and terms_response.json():
-            term_value = terms_response.json()[0]["value"]
-            response = test_sts_client.get(
-                f"/v2/model/CTDC/version/1.7.0/node/diagnosis"
-                f"/property/meddra_disease_code/term/{term_value}"
-            )
-            assert response.status_code == 200
-            assert response.json()["value"] == term_value
-            assert "type" in response.json()
-            assert response.json()["type"] == "Term"
-    
+        # Use a known valid term value from the test data
+        term_value = "10010029"
+        response = test_sts_client.get(
+            f"/v2/model/CTDC/version/1.7.0/node/diagnosis"
+            f"/property/meddra_disease_code/term/{term_value}"
+        )
+        assert response.status_code == 200
+        assert response.json() is not None
+        assert response.json()["value"] == term_value
+        assert "type" in response.json()
+        assert response.json()["type"] == "Term"
+
     def test_model_node_property_term_get_invalid(self, test_sts_client):
         # Test with non-existent term value
         response = test_sts_client.get("/v2/model/CTDC/version/1.7.0/node/diagnosis"
