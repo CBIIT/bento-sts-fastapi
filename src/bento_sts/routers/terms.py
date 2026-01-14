@@ -79,7 +79,7 @@ def pvs_synonyms_model_version_get(request: Request, model: str, property: str =
     WITH prop, CDECode, CDEVersion, CDEFullName, model_pvs, cde_pvs, has_cde, should_use_null_cde,
       CASE WHEN should_use_null_cde THEN COLLECT(DISTINCT null_pv) ELSE [] END AS null_pvs
     // Get all unique alternate values for all CDE PVs 
-    UNWIND cde_pvs AS temp_pv
+    UNWIND CASE WHEN size(cde_pvs) > 0 THEN cde_pvs ELSE [null] END AS temp_pv
     OPTIONAL MATCH (temp_pv)-[:represents]->(c_alt:concept)<-[:represents]-(alt_pv:term {{origin_name: "caDSR_alternates"}}), (c_alt)-[:has_tag]->(:tag {{key: "mapping_source", value: "alternate_name"}})
       WHERE temp_pv <> alt_pv AND alt_pv.value IS NOT NULL
     WITH prop, CDECode, CDEVersion, CDEFullName, model_pvs, cde_pvs, null_pvs, has_cde, should_use_null_cde,
