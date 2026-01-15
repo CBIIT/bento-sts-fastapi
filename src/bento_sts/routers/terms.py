@@ -98,7 +98,6 @@ def pvs_synonyms_model_version_get(request: Request, model: str, property: str =
           THEN model_pvs
         ELSE [] 
       END AS pvs
-    WHERE size(pvs) > 0 OR size(null_pvs) > 0 OR size(alternate_values) > 0
     WITH prop, CDECode, CDEVersion, CDEFullName, model_pvs, cde_pvs, null_pvs, alternate_values, has_cde, pvs,
      apoc.coll.toSet(
        (CASE WHEN size(pvs) > 0 THEN pvs ELSE [] END) +
