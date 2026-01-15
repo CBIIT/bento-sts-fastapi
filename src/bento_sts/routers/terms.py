@@ -68,7 +68,7 @@ def pvs_synonyms_model_version_get(request: Request, model: str, property: str =
       ANY(ut IN COLLECT(use_null_tag) WHERE ut.value IN ["Yes", "True", "true"] OR ut.value = true) AS should_use_null_cde
     // Get PVs defined in the MDF model for this property
     OPTIONAL MATCH (prop)-[:has_value_set]->(:value_set)-[:has_term]->(model_pv:term)
-    WITH prop, cde, CDECode, CDEVersion, CDEFullName, cde_hdl, has_cde, should_use_null_cde,
+    WITH distinct prop.handle AS prop, cde, CDECode, CDEVersion, CDEFullName, cde_hdl, has_cde, should_use_null_cde,
       collect(DISTINCT model_pv) AS model_pvs
     // Get the CDE's official PVs from the value set
     OPTIONAL MATCH (v:value_set {{handle: cde_hdl}})-[:has_term]->(cde_pv:term)
@@ -98,7 +98,7 @@ def pvs_synonyms_model_version_get(request: Request, model: str, property: str =
           THEN model_pvs
         ELSE [] 
       END AS pvs
-    WITH prop, CDECode, CDEVersion, CDEFullName, model_pvs, cde_pvs, null_pvs, alternate_values, has_cde, pvs,
+    WITH prop, CDECode, CDEVersion, CDEFullName, cde_pvs, null_pvs, alternate_values, has_cde, pvs,
      apoc.coll.toSet(
        (CASE WHEN size(pvs) > 0 THEN pvs ELSE [] END) +
        (CASE WHEN size(null_pvs) > 0 THEN null_pvs ELSE [] END)
@@ -109,15 +109,15 @@ def pvs_synonyms_model_version_get(request: Request, model: str, property: str =
     // Find any synonyms associated with the NCIt term in the NCI Metathesaurus data
     OPTIONAL MATCH (ncit_term)-[:represents]->(c_ncim:concept)<-[:represents]-(syn:term), (c_ncim)-[:has_tag]->(:tag {{key: "mapping_source", value: "NCIm"}})
       WHERE pv <> syn and pv.value <> syn.value
-    WITH prop, CDECode, CDEVersion, CDEFullName, model_pvs, alternate_values, pv.value AS pv_val,
+    WITH prop, CDECode, CDEVersion, CDEFullName, alternate_values, pv.value AS pv_val,
       ncit_term.origin_id AS ncit_oid, ncit_term.value AS ncit_value,
       collect(DISTINCT syn.value) AS distinct_syn_vals
-    WITH prop, CDECode, CDEVersion, CDEFullName, model_pvs, alternate_values, pv_val, ncit_oid,
+    WITH prop, CDECode, CDEVersion, CDEFullName, alternate_values, pv_val, ncit_oid,
       CASE WHEN ncit_value IS NOT NULL
         THEN distinct_syn_vals + [ncit_value]
         ELSE distinct_syn_vals END AS syn_vals
     // Format the PVs with their synonyms and NCIt codes
-    WITH prop, CDECode, CDEVersion, CDEFullName, model_pvs, alternate_values,
+    WITH prop, CDECode, CDEVersion, CDEFullName, alternate_values,
       [pv_item IN collect({{value: pv_val, synonyms: syn_vals, ncit_concept_code: ncit_oid}}) WHERE pv_item.value IS NOT NULL] AS formatted_pvs
     // Extract regular PV values for deduplication
     WITH prop, CDECode, CDEVersion, CDEFullName, formatted_pvs,
@@ -129,8 +129,9 @@ def pvs_synonyms_model_version_get(request: Request, model: str, property: str =
     // Combine formatted PVs with filtered null PVs and alternates PVs
     WITH prop, CDECode, CDEVersion, CDEFullName, formatted_pvs + formatted_alts AS all_pvs
     // Return the results with pagination support
+
     RETURN DISTINCT $p0 AS model, $p1 AS version,
-      prop.handle AS property,
+      prop AS property,
       CASE 
         WHEN $p4 > 0 THEN all_pvs[$p3..($p3 + $p4)]
         WHEN $p3 > 0 THEN all_pvs[$p3..]
