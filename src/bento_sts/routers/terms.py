@@ -79,7 +79,7 @@ def pvs_synonyms_model_version_get(request: Request, model: str, property: str =
     WITH prop, CDECode, CDEVersion, CDEFullName, model_pvs, cde_pvs, has_cde, should_use_null_cde,
       CASE WHEN should_use_null_cde THEN COLLECT(DISTINCT null_pv) ELSE [] END AS null_pvs
     // Get all unique alternate values for all CDE PVs 
-    UNWIND cde_pvs AS temp_pv
+    UNWIND CASE WHEN size(cde_pvs) > 0 THEN cde_pvs ELSE [null] END AS temp_pv
     OPTIONAL MATCH (temp_pv)-[:represents]->(c_alt:concept)<-[:represents]-(alt_pv:term {{origin_name: "caDSR_alternates"}}), (c_alt)-[:has_tag]->(:tag {{key: "mapping_source", value: "alternate_name"}})
       WHERE temp_pv <> alt_pv AND alt_pv.value IS NOT NULL
     WITH prop, CDECode, CDEVersion, CDEFullName, model_pvs, cde_pvs, null_pvs, has_cde, should_use_null_cde,
@@ -98,34 +98,36 @@ def pvs_synonyms_model_version_get(request: Request, model: str, property: str =
           THEN model_pvs
         ELSE [] 
       END AS pvs
-    WHERE size(pvs) > 0 OR size(null_pvs) > 0 OR size(alternate_values) > 0
-    UNWIND CASE WHEN size(pvs) > 0 THEN pvs ELSE [null] END AS pv
+    WITH prop, CDECode, CDEVersion, CDEFullName, model_pvs, cde_pvs, null_pvs, alternate_values, has_cde, pvs,
+     apoc.coll.toSet(
+       (CASE WHEN size(pvs) > 0 THEN pvs ELSE [] END) +
+       (CASE WHEN size(null_pvs) > 0 THEN null_pvs ELSE [] END)
+     ) AS pvs_all
+    UNWIND CASE WHEN size(pvs_all) > 0 THEN pvs_all ELSE [null] END AS pv
     // For each PV, obtain the NCIt term associated with it according to caDSR
     OPTIONAL MATCH (pv)-[:represents]->(c_cadsr:concept)<-[:represents]-(ncit_term:term {{origin_name: "NCIt"}}), (c_cadsr)-[:has_tag]->(:tag {{key: "mapping_source", value: "caDSR"}})
     // Find any synonyms associated with the NCIt term in the NCI Metathesaurus data
     OPTIONAL MATCH (ncit_term)-[:represents]->(c_ncim:concept)<-[:represents]-(syn:term), (c_ncim)-[:has_tag]->(:tag {{key: "mapping_source", value: "NCIm"}})
       WHERE pv <> syn and pv.value <> syn.value
-    WITH prop, CDECode, CDEVersion, CDEFullName, model_pvs, null_pvs, alternate_values, pv.value AS pv_val,
+    WITH prop, CDECode, CDEVersion, CDEFullName, model_pvs, alternate_values, pv.value AS pv_val,
       ncit_term.origin_id AS ncit_oid, ncit_term.value AS ncit_value,
       collect(DISTINCT syn.value) AS distinct_syn_vals
-    WITH prop, CDECode, CDEVersion, CDEFullName, model_pvs, null_pvs, alternate_values, pv_val, ncit_oid,
+    WITH prop, CDECode, CDEVersion, CDEFullName, model_pvs, alternate_values, pv_val, ncit_oid,
       CASE WHEN ncit_value IS NOT NULL
         THEN distinct_syn_vals + [ncit_value]
         ELSE distinct_syn_vals END AS syn_vals
     // Format the PVs with their synonyms and NCIt codes
-    WITH prop, CDECode, CDEVersion, CDEFullName, model_pvs, null_pvs, alternate_values,
+    WITH prop, CDECode, CDEVersion, CDEFullName, model_pvs, alternate_values,
       [pv_item IN collect({{value: pv_val, synonyms: syn_vals, ncit_concept_code: ncit_oid}}) WHERE pv_item.value IS NOT NULL] AS formatted_pvs
     // Extract regular PV values for deduplication
     WITH prop, CDECode, CDEVersion, CDEFullName, formatted_pvs,
       [pv IN formatted_pvs | pv.value] AS regular_pv_values,
-      [n IN null_pvs | n.value] AS null_cde_pvs,
       alternate_values
     // Filter out null PVs and alternates in regular PVs
     WITH prop, CDECode, CDEVersion, CDEFullName, formatted_pvs,
-      [val IN null_cde_pvs WHERE NOT val IN regular_pv_values | {{value: val}}] AS formatted_null_pvs,
       [val IN alternate_values WHERE NOT val IN regular_pv_values | {{value: val, synonyms: []}}] AS formatted_alts
     // Combine formatted PVs with filtered null PVs and alternates PVs
-    WITH prop, CDECode, CDEVersion, CDEFullName, formatted_pvs + formatted_null_pvs + formatted_alts AS all_pvs
+    WITH prop, CDECode, CDEVersion, CDEFullName, formatted_pvs + formatted_alts AS all_pvs
     // Return the results with pagination support
     RETURN DISTINCT $p0 AS model, $p1 AS version,
       prop.handle AS property,
