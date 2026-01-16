@@ -117,17 +117,17 @@ def pvs_synonyms_model_version_get(request: Request, model: str, property: str =
         THEN distinct_syn_vals + [ncit_value]
         ELSE distinct_syn_vals END AS syn_vals
     // Format the PVs with their synonyms and NCIt codes
-    WITH prop, CDECode, CDEVersion, CDEFullName, alternate_values,
-      [pv_item IN collect({{value: pv_val, synonyms: syn_vals, ncit_concept_code: ncit_oid}}) WHERE pv_item.value IS NOT NULL] AS formatted_pvs
+    WITH prop, collect(DISTINCT alternate_values) as alternate_values_list,
+      [pv_item IN collect(distinct {{value: pv_val, synonyms: syn_vals, ncit_concept_code: ncit_oid}}) WHERE pv_item.value IS NOT NULL] AS formatted_pvs
     // Extract regular PV values for deduplication
-    WITH prop, CDECode, CDEVersion, CDEFullName, formatted_pvs,
+    WITH prop, formatted_pvs,
       [pv IN formatted_pvs | pv.value] AS regular_pv_values,
-      alternate_values
+      apoc.coll.toSet(apoc.coll.flatten(alternate_values_list)) as alternate_values
     // Filter out null PVs and alternates in regular PVs
-    WITH prop, CDECode, CDEVersion, CDEFullName, formatted_pvs,
+    WITH prop, formatted_pvs,
       [val IN alternate_values WHERE NOT val IN regular_pv_values | {{value: val, synonyms: []}}] AS formatted_alts
     // Combine formatted PVs with filtered null PVs and alternates PVs
-    WITH prop, CDECode, CDEVersion, CDEFullName, formatted_pvs + formatted_alts AS all_pvs
+    WITH prop, formatted_pvs + formatted_alts AS all_pvs
     // Return the results with pagination support
 
     RETURN DISTINCT $p0 AS model, $p1 AS version,
