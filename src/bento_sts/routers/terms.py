@@ -86,22 +86,22 @@ def pvs_synonyms_model_version_get(request: Request, model: str, property: str =
       collect(DISTINCT alt_pv.value) AS alternate_values
     // Determine which PV set to use based on availability and content
     WITH prop, CDECode, CDEVersion, CDEFullName, model_pvs, cde_pvs, null_pvs, alternate_values, has_cde,
-      CASE 
-        // When there are cde_pvs for property and there are no URLs in the pv list
-        WHEN has_cde AND size(cde_pvs) > 0 AND NONE(p in cde_pvs WHERE p.value =~ "https?://.*")
-          THEN cde_pvs
-        // When the "value set" of the CDE is just a url ("values by reference"), return the model's defined enum as the pvs
-        WHEN has_cde and size(cde_pvs) > 0 AND ANY(p in cde_pvs WHERE p.value =~ "https?://.*") AND size(model_pvs) > 0
-          THEN model_pvs
-        // When there's no CDE but model has pvs
-        WHEN NOT has_cde AND size(model_pvs) > 0
-          THEN model_pvs
-        ELSE [] 
-      END AS pvs
-    WITH prop, CDECode, CDEVersion, CDEFullName, cde_pvs, null_pvs, alternate_values, has_cde, pvs,
+      CASE WHEN has_cde and size(cde_pvs) > 0 AND ANY(p in cde_pvs WHERE p.value =~ "https?://.*")
+          THEN true
+        WHEN has_cde and size(cde_pvs) > 0 AND NONE(p in cde_pvs WHERE p.value =~ "https?://.*")
+          THEN false
+        ELSE true 
+      END AS fall_back_to_model_pvs
+    WITH prop, CDECode, CDEVersion, CDEFullName, model_pvs, fall_back_to_model_pvs, CASE WHEN fall_back_to_model_pvs THEN [] ELSE cde_pvs END AS pvs, null_pvs, CASE WHEN fall_back_to_model_pvs THEN [] ELSE alternate_values END AS alternate_values
+    WITH prop, model_pvs, all(x IN collect(fall_back_to_model_pvs) WHERE x = true) AS overall_fall_back_flag, 
+                          apoc.coll.toSet(apoc.coll.flatten(collect(DISTINCT pvs))) as pvs_list,
+                          apoc.coll.toSet(apoc.coll.flatten(collect(DISTINCT null_pvs))) as null_pvs_list,
+                          apoc.coll.toSet(apoc.coll.flatten(collect(DISTINCT alternate_values))) as alternate_values_list
+    WITH prop, case when overall_fall_back_flag then model_pvs else pvs_list end as pvs, null_pvs_list, alternate_values_list
+    WITH prop, alternate_values_list,
      apoc.coll.toSet(
        (CASE WHEN size(pvs) > 0 THEN pvs ELSE [] END) +
-       (CASE WHEN size(null_pvs) > 0 THEN null_pvs ELSE [] END)
+       (CASE WHEN size(null_pvs_list) > 0 THEN null_pvs_list ELSE [] END)
      ) AS pvs_all
     UNWIND CASE WHEN size(pvs_all) > 0 THEN pvs_all ELSE [null] END AS pv
     // For each PV, obtain the NCIt term associated with it according to caDSR
@@ -109,23 +109,22 @@ def pvs_synonyms_model_version_get(request: Request, model: str, property: str =
     // Find any synonyms associated with the NCIt term in the NCI Metathesaurus data
     OPTIONAL MATCH (ncit_term)-[:represents]->(c_ncim:concept)<-[:represents]-(syn:term), (c_ncim)-[:has_tag]->(:tag {{key: "mapping_source", value: "NCIm"}})
       WHERE pv <> syn and pv.value <> syn.value
-    WITH prop, CDECode, CDEVersion, CDEFullName, alternate_values, pv.value AS pv_val,
+    WITH prop, alternate_values_list, pv.value AS pv_val,
       ncit_term.origin_id AS ncit_oid, ncit_term.value AS ncit_value,
       collect(DISTINCT syn.value) AS distinct_syn_vals
-    WITH prop, CDECode, CDEVersion, CDEFullName, alternate_values, pv_val, ncit_oid,
+    WITH prop, alternate_values_list, pv_val, ncit_oid,
       CASE WHEN ncit_value IS NOT NULL
         THEN distinct_syn_vals + [ncit_value]
         ELSE distinct_syn_vals END AS syn_vals
     // Format the PVs with their synonyms and NCIt codes
-    WITH prop, collect(DISTINCT alternate_values) as alternate_values_list,
-      [pv_item IN collect(distinct {{value: pv_val, synonyms: syn_vals, ncit_concept_code: ncit_oid}}) WHERE pv_item.value IS NOT NULL] AS formatted_pvs
+    WITH prop, alternate_values_list,
+      [pv_item IN apoc.coll.toSet(apoc.coll.flatten(collect(DISTINCT {{value: pv_val, synonyms: syn_vals, ncit_concept_code: ncit_oid}}))) WHERE pv_item.value IS NOT NULL] AS formatted_pvs
     // Extract regular PV values for deduplication
     WITH prop, formatted_pvs,
-      [pv IN formatted_pvs | pv.value] AS regular_pv_values,
-      apoc.coll.toSet(apoc.coll.flatten(alternate_values_list)) as alternate_values
+      [pv IN formatted_pvs | pv.value] AS regular_pv_values, alternate_values_list
     // Filter out null PVs and alternates in regular PVs
     WITH prop, formatted_pvs,
-      [val IN alternate_values WHERE NOT val IN regular_pv_values | {{value: val, synonyms: []}}] AS formatted_alts
+      [val IN alternate_values_list WHERE NOT val IN regular_pv_values | {{value: val, synonyms: []}}] AS formatted_alts
     // Combine formatted PVs with filtered null PVs and alternates PVs
     WITH prop, formatted_pvs + formatted_alts AS all_pvs
     // Return the results with pagination support
