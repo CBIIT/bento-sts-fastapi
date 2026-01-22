@@ -172,9 +172,9 @@ def cde_pvs_by_id_with_version_get(request: Request, id: str, version: str, use_
     WITH n0, value_set_url, pvs,
       CASE WHEN {use_null} THEN COLLECT(DISTINCT null_pv) ELSE [] END AS null_pvs
     // Get all unique alternate values for all CDE PVs (including null PVs)
-    UNWIND pvs + null_pvs AS temp_pv
+    UNWIND CASE WHEN size(pvs) > 0 OR size(null_pvs) > 0 THEN pvs + null_pvs ELSE [null] END AS temp_pv
     OPTIONAL MATCH (temp_pv)-[:represents]->(c_alt:concept)<-[:represents]-(alt_pv:term {{origin_name: "caDSR_alternates"}}), (c_alt)-[:has_tag]->(:tag {{key: "mapping_source", value: "alternate_name"}})
-      WHERE temp_pv <> alt_pv AND alt_pv.value IS NOT NULL
+      WHERE temp_pv IS NOT NULL AND temp_pv <> alt_pv AND alt_pv.value IS NOT NULL
     WITH n0, value_set_url, pvs, null_pvs,
       collect(DISTINCT alt_pv.value) AS alternate_values
     // Get regular PV values for deduplication
@@ -219,6 +219,7 @@ def cde_pvs_by_id_with_version_get(request: Request, id: str, version: str, use_
     RETURN distinct CDECode, CDEVersion, CDEFullName, permissibleValues"""
     ret = request.state.mdb.get_with_statement(
         stmt,
-        {"p0": id, "p1": version, "p2": request.state.skip, "p3": request.state.limit}
+        {"p0": id, "p1": version, "p2": request.state.skip, "p3": request.state.limit},
+        raise_on_empty=False
     )
     return [record.data() if hasattr(record, 'data') else dict(record.items()) for record in ret]
