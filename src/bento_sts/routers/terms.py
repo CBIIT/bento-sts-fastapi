@@ -171,8 +171,8 @@ def cde_pvs_by_id_with_version_get(request: Request, id: str, version: str, use_
     OPTIONAL MATCH (null_vs:value_set {{handle: "{NULL_CDE_ID}"}})-[:has_term]->(null_pv:term)
     WITH n0, value_set_url, pvs,
       CASE WHEN {use_null} THEN COLLECT(DISTINCT null_pv) ELSE [] END AS null_pvs
-    // Get all unique alternate values for all CDE PVs (including null PVs)
-    UNWIND CASE WHEN size(pvs) > 0 OR size(null_pvs) > 0 THEN pvs + null_pvs ELSE [null] END AS temp_pv
+    // Get all unique alternate values for CDE PVs only (not null PVs)
+    UNWIND CASE WHEN size(pvs) > 0 THEN pvs ELSE [null] END AS temp_pv
     OPTIONAL MATCH (temp_pv)-[:represents]->(c_alt:concept)<-[:represents]-(alt_pv:term {{origin_name: "caDSR_alternates"}}), (c_alt)-[:has_tag]->(:tag {{key: "mapping_source", value: "alternate_name"}})
       WHERE temp_pv IS NOT NULL AND temp_pv <> alt_pv AND alt_pv.value IS NOT NULL
     WITH n0, value_set_url, pvs, null_pvs,
