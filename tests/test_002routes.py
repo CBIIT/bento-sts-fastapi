@@ -289,8 +289,19 @@ class TestTermsRouter:
     
     def test_cde_pvs_by_id_without_version_get(self, test_sts_client):
         response = test_sts_client.get("/v2/terms/cde-pvs/test_id/none/pvs")
-        assert response.status_code == 404
-        assert response.json()['detail'] == "Not found."
+        assert response.status_code == 200
+        assert response.json() == []
+    
+    def test_cde_pvs_by_id_with_empty_pvs(self, test_sts_client):
+        # Test CDE that exists but has no permissible values
+        response = test_sts_client.get("/v2/terms/cde-pvs/2413278/1.20/pvs")
+        assert response.status_code == 200
+        result = response.json()
+        assert isinstance(result, list)
+        assert len(result) == 1
+        assert result[0]['CDECode'] == '2413278'
+        assert result[0]['CDEVersion'] == '1.20'
+        assert result[0]['permissibleValues'] == []
 
 
 class TestEdgeCases:
