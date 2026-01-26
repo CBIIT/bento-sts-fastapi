@@ -1,5 +1,5 @@
 import semver
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, Request, HTTPException
 from typing import List
 from functools import cmp_to_key
 from ..dependencies import paging_params
@@ -37,8 +37,13 @@ def models_get(request: Request) -> List[Model]:
     limit = request.state.limit
     limit = limit if limit and limit > 0 else None
 
-    return (sorted_models[skip:skip + limit]
-            if limit is not None else sorted_models[skip:])
+    result = (sorted_models[skip:skip + limit]
+              if limit is not None else sorted_models[skip:])
+    # skip and limit are handled upstream; here we return 404 when the result set is empty.
+    if not result:
+        raise HTTPException(status_code=404, detail="Not found.")
+    
+    return result
 
 
 @router.get(
