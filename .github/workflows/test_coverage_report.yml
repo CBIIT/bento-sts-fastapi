@@ -17,9 +17,6 @@ jobs:
     permissions:
       packages: read
       contents: read
-    defaults:
-      run:
-        working-directory: ./python
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -32,7 +29,8 @@ jobs:
       - name: Create venv and install
         run: |
           uv venv
-          uv pip install -e .[dev]
+          uv pip install -e ".[dev]"
+          uv pip install pytest-cov
 
       - name: Authenticate to registry and pull test MDB
         run: |
@@ -61,7 +59,7 @@ jobs:
           export NEO4J_MDB_URI=bolt://localhost:7687 NEO4J_MDB_USER=neo4j1 \
                  NEO4J_MDB_PASS=neo4j
           echo Response: `curl http://localhost:7474`
-          uv run pytest -s -k cicd --cov=bento_meta --cov-report=xml --cov-report=term-missing
+          uv run pytest -s -k cicd --cov=bento_sts_fastapi --cov-report=xml --cov-report=term-missing
 
       - name: Upload coverage to Coveralls
         uses: coverallsapp/github-action@v2
