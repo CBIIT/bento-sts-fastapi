@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends, Request, HTTPException
 from typing import List
 from ..dependencies import paging_params
 from ..converters import neo_to_py
-from ..pymodels import Model, Node, PropertyResponse, Term
+from ..pymodels import Model, Node, PropertyResponse, Term, TermWithDefinition
 from ..utility.version_utils import model_version_compare
 
 router = APIRouter(
@@ -307,6 +307,7 @@ def model_model_handle_node_node_handle_property_prop_handle_terms_count_get(req
 @router.get(
     "/{modelHandle}/version/{versionString}/node/{nodeHandle}/property/{propHandle}/term/{termValue}",
     summary="Get a specific term value for specified property",
+    response_model=List[TermWithDefinition],
     responses={
         200: {"description": "Successful Response"},
         404: {"description": "Not found."},
@@ -316,11 +317,13 @@ def model_model_handle_node_node_handle_property_prop_handle_terms_count_get(req
 def model_model_handle_node_node_handle_property_prop_handle_term_term_value_get(
         request: Request,
         modelHandle: str, versionString: str,
-        nodeHandle: str, propHandle: str, termValue: str) -> List[Term]:
+        nodeHandle: str, propHandle: str, termValue: str) -> List[TermWithDefinition]:
     stmt = " ".join([
         'MATCH (n0:node {model:$p0,version:$p1,handle:$p2})-[r0:has_property]->(n1:property {handle:$p3})',
         '-[r1:has_value_set]->(n3:value_set)-[r2:has_term]->(n2:term {value:$p4})',
-        'RETURN n2 as term'
+        'WITH n2.value as term_value',
+        'MATCH (all_terms:term {value: term_value})',
+        'RETURN all_terms as term'
     ])
     rows = request.state.mdb.get_with_statement(
         stmt,
@@ -328,5 +331,5 @@ def model_model_handle_node_node_handle_property_prop_handle_term_term_value_get
     )
     ret = []
     for row in rows:
-        ret.append(neo_to_py(row['term']))
+        ret.append(TermWithDefinition(**dict(row['term'].items())))
     return ret

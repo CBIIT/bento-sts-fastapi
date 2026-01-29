@@ -51,6 +51,17 @@ class Term(BaseModel):
     nanoid: str
 
 
+class TermWithDefinition(BaseModel):
+    type: Literal['Term'] = 'Term'
+    value: str
+    origin_name: str
+    handle: str | None = None
+    origin_version: str | None = None
+    origin_id: str | None = None
+    origin_definition: str | None = None
+    _commit: str | None = None
+    nanoid: str
+
 class Tag(BaseModel):
     type: Literal['Tag'] = 'Tag'
     key: str
