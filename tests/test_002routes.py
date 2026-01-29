@@ -221,7 +221,7 @@ class TestModelRouter:
         assert response.status_code == 200
         assert response.json() is not None
         assert isinstance(response.json(), list)
-        assert len(response.json()) == 1
+        assert len(response.json()) == 2
         assert response.json()[0]["value"] == term_value
         assert "type" in response.json()[0]
         assert response.json()[0]["type"] == "Term"
