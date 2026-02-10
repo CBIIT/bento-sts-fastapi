@@ -305,7 +305,7 @@ def model_model_handle_node_node_handle_property_prop_handle_terms_count_get(req
     return count
 
 @router.get(
-    "/{modelHandle}/version/{versionString}/node/{nodeHandle}/property/{propHandle}/term/{termValue}",
+    "/{modelHandle}/version/{versionString}/node/{nodeHandle}/property/{propHandle}/term/{termValue:path}",
     summary="Get a specific term value for specified property",
     responses={
         200: {"description": "Successful Response"},
