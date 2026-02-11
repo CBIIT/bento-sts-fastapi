@@ -233,6 +233,25 @@ class TestModelRouter:
         assert response.status_code == 404
         assert response.json()['detail'] == "Not found."
 
+    def test_model_node_property_term_get_with_space_and_comma(self, test_sts_client):
+        """
+        Test term endpoint with both spaces and comma in term value.
+        """
+        # Test with a term that contains both spaces and comma
+        term_value = "C05.1 : Soft palate, NOS"
+        
+        response = test_sts_client.get(
+            f"/v2/model/C3DC/version/4.0.5/node/diagnosis"
+            f"/property/anatomic_site/term/{term_value}"
+        )
+        
+        assert response.status_code == 200
+        assert response.json() is not None
+        assert isinstance(response.json(), list)
+        assert len(response.json()) == 1
+        assert response.json()[0]["value"] == term_value
+        assert response.json()[0]["type"] == "Term"
+
 
 class TestIdRouter:
     """Tests for /id endpoints"""
