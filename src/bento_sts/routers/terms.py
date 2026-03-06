@@ -112,6 +112,7 @@ def pvs_synonyms_model_version_get(request: Request, model: str, property: str =
     WITH prop, alternate_values_list, pv.value AS pv_val,
       ncit_term.origin_id AS ncit_oid, ncit_term.value AS ncit_value,
       collect(DISTINCT syn.value) AS distinct_syn_vals
+    WHERE pv_val IS NOT NULL
     WITH prop, alternate_values_list, pv_val, ncit_oid,
       CASE WHEN ncit_value IS NOT NULL
         THEN distinct_syn_vals + [ncit_value]
