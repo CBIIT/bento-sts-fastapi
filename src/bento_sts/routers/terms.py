@@ -116,9 +116,15 @@ def pvs_synonyms_model_version_get(request: Request, model: str, property: str =
       CASE WHEN ncit_value IS NOT NULL
         THEN distinct_syn_vals + [ncit_value]
         ELSE distinct_syn_vals END AS syn_vals
-    // Format the PVs with their synonyms and NCIt codes
+    // Collect all PV items before deduplication
     WITH prop, alternate_values_list,
-      [pv_item IN apoc.coll.toSet(apoc.coll.flatten(collect(DISTINCT {{value: pv_val, synonyms: syn_vals, ncit_concept_code: ncit_oid}}))) WHERE pv_item.value IS NOT NULL] AS formatted_pvs
+      collect({{value: pv_val, synonyms: syn_vals, ncit_concept_code: ncit_oid}}) AS pv_items
+    // Format the PVs with their synonyms and NCIt codes - deduplicate by (value, ncit_concept_code)
+    WITH prop, alternate_values_list,
+      [item IN apoc.coll.toSet([p IN pv_items | {{value: p.value, ncit_concept_code: p.ncit_concept_code}}]) | 
+        {{value: item.value, 
+          synonyms: apoc.coll.toSet(apoc.coll.flatten([p IN pv_items WHERE p.value = item.value AND p.ncit_concept_code = item.ncit_concept_code | p.synonyms])), 
+          ncit_concept_code: item.ncit_concept_code}}] AS formatted_pvs
     // Extract regular PV values for deduplication
     WITH prop, formatted_pvs,
       [pv IN formatted_pvs | pv.value] AS regular_pv_values, alternate_values_list
