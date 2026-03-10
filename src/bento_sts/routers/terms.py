@@ -110,12 +110,8 @@ def pvs_synonyms_model_version_get(request: Request, model: str, property: str =
     OPTIONAL MATCH (ncit_term)-[:represents]->(c_ncim:concept)<-[:represents]-(syn:term), (c_ncim)-[:has_tag]->(:tag {{key: "mapping_source", value: "NCIm"}})
       WHERE pv <> syn and pv.value <> syn.value
     WITH prop, alternate_values_list, pv.value AS pv_val,
-      ncit_term.origin_id AS ncit_oid, ncit_term.value AS ncit_value,
-      collect(DISTINCT syn.value) AS distinct_syn_vals
-    WITH prop, alternate_values_list, pv_val, ncit_oid,
-      CASE WHEN ncit_value IS NOT NULL
-        THEN distinct_syn_vals + [ncit_value]
-        ELSE distinct_syn_vals END AS syn_vals
+      collect(DISTINCT ncit_term.origin_id)[0] AS ncit_oid,
+      collect(DISTINCT syn.value) + [x IN collect(DISTINCT ncit_term.value) WHERE x IS NOT NULL] AS syn_vals
     // Format the PVs with their synonyms and NCIt codes
     WITH prop, alternate_values_list,
       [pv_item IN apoc.coll.toSet(apoc.coll.flatten(collect(DISTINCT {{value: pv_val, synonyms: syn_vals, ncit_concept_code: ncit_oid}}))) WHERE pv_item.value IS NOT NULL] AS formatted_pvs
@@ -193,12 +189,11 @@ def cde_pvs_by_id_with_version_get(request: Request, id: str, version: str, use_
       WHERE pv IS NOT NULL AND pv <> syn and pv.value <> syn.value
     WITH n0, value_set_url, alternate_values,
       CASE WHEN pv IS NULL THEN null ELSE pv.value END as pv_val,
-      CASE WHEN pv IS NULL THEN null ELSE ncit_term.origin_id END AS ncit_oid,
-      CASE WHEN pv IS NULL THEN null ELSE ncit_term.value END AS ncit_value,
-      collect(DISTINCT syn.value) AS distinct_syn_vals
+      collect(DISTINCT ncit_term.origin_id)[0] AS ncit_oid,
+      collect(DISTINCT syn.value) + [x IN collect(DISTINCT ncit_term.value) WHERE x IS NOT NULL] AS syn_vals
     // Format the PVs with their synonyms and NCIt codes
     WITH n0, value_set_url, alternate_values,
-      CASE WHEN pv_val IS NULL THEN [] ELSE collect({{value: pv_val, synonyms: CASE WHEN ncit_value IS NOT NULL THEN distinct_syn_vals + [ncit_value] ELSE distinct_syn_vals END, ncit_concept_code: ncit_oid}}) END AS permissibleValues
+      CASE WHEN pv_val IS NULL THEN [] ELSE collect({{value: pv_val, synonyms: syn_vals, ncit_concept_code: ncit_oid}}) END AS permissibleValues
     // Extract all PV values for alternate deduplication
     WITH n0, permissibleValues,
       [pv IN permissibleValues | pv.value] AS all_pv_values,
