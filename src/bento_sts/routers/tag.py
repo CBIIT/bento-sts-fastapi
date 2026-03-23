@@ -50,7 +50,7 @@ def tag_key_values_get(request: Request, key: str) -> List[str]:
 )
 def tag_key_value_entities_get(request: Request, key: str, value: str) -> List[Node | Property | Relationship | Term | Concept]:
     stmt = " ".join([
-        'MATCH (n1)-[r0:has_tag]->(n0:tag {key:$p0,value:$p1}) RETURN n1 as entity',
+        'MATCH (n1)-[r0:has_tag]->(n0:tag {key:$p0,value:$p1}) RETURN DISTINCT n1 as entity',
         f"SKIP {request.state.skip} " if request.state.skip else "",
         f"LIMIT {request.state.limit}" if request.state.limit else ""])
     ret = []
@@ -72,7 +72,7 @@ def tag_key_value_entities_get(request: Request, key: str, value: str) -> List[N
     },
 )
 def tag_key_value_entities_count_get(request: Request, key: str, value: str) -> int:
-    stmt = 'MATCH (n1)-[r0:has_tag]->(n0:tag {key:$p0,value:$p1}) RETURN count(n1) as count'
+    stmt = 'MATCH (n1)-[r0:has_tag]->(n0:tag {key:$p0,value:$p1}) RETURN count(DISTINCT n1) as count'
     ret = request.state.mdb.get_with_statement(
         stmt,
         {"p0": key, "p1": value}

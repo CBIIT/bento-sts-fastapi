@@ -59,6 +59,69 @@ class TestTagRouter:
             assert response.status_code == 200
             assert isinstance(response.json(), int)
 
+    # Cypher that finds (key, value) pairs where any entity is connected via
+    # more than one has_tag edge — these are exactly the cases that produce
+    # duplicates.
+    _MULTI_EDGE_TAGS_STMT = (
+        "MATCH (n1)-[r:has_tag]->(t:tag) "
+        "WITH n1.nanoid AS nanoid, t.key AS key, t.value AS value, count(r) AS cnt "
+        "WHERE cnt > 1 "
+        "RETURN DISTINCT key, value "
+        "LIMIT 50"
+    )
+
+    def test_entities_no_duplicates_for_multi_edge_tags(
+        self, test_sts_client, test_sts_mdb
+    ):
+        """Entities connected via multiple has_tag edges must appear only once."""
+        rows = test_sts_mdb.get_with_statement(
+            self._MULTI_EDGE_TAGS_STMT, {}, raise_on_empty=False
+        )
+        duplicates_found = []
+        for row in rows:
+            key, value = row["key"], row["value"]
+            response = test_sts_client.get(f"/v2/tag/{key}/{value}/entities")
+            assert response.status_code == 200, (
+                f"Unexpected status for tag key='{key}' value='{value}'"
+            )
+            nanoids = [e["nanoid"] for e in response.json() if e.get("nanoid")]
+            dupes = [nid for nid in set(nanoids) if nanoids.count(nid) > 1]
+            if dupes:
+                duplicates_found.append(
+                    f"key='{key}' value='{value}' → duplicated nanoids: {dupes}"
+                )
+
+        assert not duplicates_found, (
+            "Duplicate nanoids in /entities response (DISTINCT missing?):\n"
+            + "\n".join(duplicates_found)
+        )
+
+    def test_entities_count_matches_list_for_multi_edge_tags(
+        self, test_sts_client, test_sts_mdb
+    ):
+        """/entities/count must equal len(/entities) for tags with multi-edge entities."""
+        rows = test_sts_mdb.get_with_statement(
+            self._MULTI_EDGE_TAGS_STMT, {}, raise_on_empty=False
+        )
+        mismatches = []
+        for row in rows:
+            key, value = row["key"], row["value"]
+            list_resp = test_sts_client.get(f"/v2/tag/{key}/{value}/entities")
+            count_resp = test_sts_client.get(f"/v2/tag/{key}/{value}/entities/count")
+            assert list_resp.status_code == 200
+            assert count_resp.status_code == 200
+            actual = len(list_resp.json())
+            reported = count_resp.json()
+            if actual != reported:
+                mismatches.append(
+                    f"key='{key}' value='{value}' → list={actual}, count={reported}"
+                )
+
+        assert not mismatches, (
+            "Count mismatch between /entities and /entities/count:\n"
+            + "\n".join(mismatches)
+        )
+
 
 class TestModelsRouter:
     """Tests for /models endpoints"""
