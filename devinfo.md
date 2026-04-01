@@ -1,6 +1,6 @@
-# bento-sts-fastapi Development Information
+# bento-sts Development Information
 
-This is a rewrite of the [bento-sts](https://github.com/CBIIT/bento-sts) 
+This is a rewrite of the [old-bento-sts](https://github.com/CBIIT/old-bento-sts) 
 following the ticket DATATEAM-268. This lays out the following requirements:
 
 * Remove web interface code and reduce to API only
@@ -18,8 +18,8 @@ To set up a local working environment:
 [Get uv](https://docs.astral.sh/uv/#installation) and then run the following
 
 ```shell
-git clone https://github.com/CBIIT/bento-sts-fastapi
-cd bento-sts-fastapi
+git clone https://github.com/CBIIT/bento-sts
+cd bento-sts
 uv venv
 uv pip install -e .
 ```
