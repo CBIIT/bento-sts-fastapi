@@ -22,7 +22,7 @@ router = APIRouter(
         422: {"description": "Bad parameters (model or property or version or skip or limit?)"},
     },
 )
-def pvs_synonyms_model_version_get(request: Request, model: str, property: str = "", version: str | None = None):
+def pvs_synonyms_model_version_get(request: Request, model: str, property: str = "", version: str | None = None, is_alternates: bool = False):
     # If version is not provided, get the latest version for the model
     if version is None or version.strip() == "":
         # find a model with is_latest_version
@@ -121,8 +121,7 @@ def pvs_synonyms_model_version_get(request: Request, model: str, property: str =
     // Filter out null PVs and alternates in regular PVs
     WITH prop, formatted_pvs,
       [val IN alternate_values_list WHERE NOT val IN regular_pv_values | {{value: val, synonyms: []}}] AS formatted_alts
-    // Combine formatted PVs with filtered null PVs and alternates PVs
-    WITH prop, formatted_pvs + formatted_alts AS all_pvs
+    WITH prop, formatted_pvs""" + (" + formatted_alts" if is_alternates else "") + """ AS all_pvs
     // Return the results with pagination support
 
     RETURN DISTINCT $p0 AS model, $p1 AS version,
@@ -150,7 +149,7 @@ def pvs_synonyms_model_version_get(request: Request, model: str, property: str =
         422: {"description": "Bad parameters (id or version or skip or limit?)"},
     },
 )
-def cde_pvs_by_id_with_version_get(request: Request, id: str, version: str, use_null_cde: bool = False):
+def cde_pvs_by_id_with_version_get(request: Request, id: str, version: str, use_null_cde: bool = False, include_alternates: bool = False):
     NULL_CDE_ID = '16476366|1'
 
     # noinspection SqlDialectInspection,SqlNoDataSourceInspection
@@ -201,8 +200,7 @@ def cde_pvs_by_id_with_version_get(request: Request, id: str, version: str, use_
     // Filter out alternates already in PVs
     WITH n0, permissibleValues,
       [val IN alternate_values WHERE NOT val IN all_pv_values | {{value: val, ncit_concept_code: null, synonyms: []}}] AS formatted_alts
-    // Combine formatted PVs with alternates
-    WITH n0, permissibleValues + formatted_alts AS all_pvs
+    WITH n0, permissibleValues""" + (" + formatted_alts" if include_alternates else "") + """ AS all_pvs
     // Return the CDE information with pagination support
     WITH n0.origin_id AS CDECode, n0.origin_version AS CDEVersion,
       n0.value AS CDEFullName, 
