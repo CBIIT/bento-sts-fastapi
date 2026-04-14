@@ -55,7 +55,7 @@ class Tag(BaseModel):
     type: Literal['Tag'] = 'Tag'
     key: str
     value: str | bool
-    nanoid: str
+    nanoid: str | None = None
 
 
 class Relationship(Entity):
