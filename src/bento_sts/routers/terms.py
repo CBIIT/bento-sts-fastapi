@@ -101,7 +101,7 @@ def pvs_synonyms_model_version_get(request: Request, model: str, property: str =
     OPTIONAL MATCH (pv)-[:represents]->(c_cadsr:concept)<-[:represents]-(ncit_term:term {{origin_name: "NCIt"}}), (c_cadsr)-[:has_tag]->(:tag {{key: "mapping_source", value: "caDSR"}})
     // Find any synonyms associated with the NCIt term in the NCI Metathesaurus data
     OPTIONAL MATCH (ncit_term)-[:represents]->(c_ncim:concept)<-[:represents]-(syn:term), (c_ncim)-[:has_tag]->(:tag {{key: "mapping_source", value: "NCIm"}})
-      WHERE pv <> syn and pv.value <> syn.value
+      WHERE syn IS NULL OR (pv <> syn AND pv.value <> syn.value)
     WITH prop, pv.value AS pv_val,
       collect(DISTINCT ncit_term.origin_id)[0] AS ncit_oid,
       collect(DISTINCT syn.value) + [x IN collect(DISTINCT ncit_term.value) WHERE x IS NOT NULL] AS syn_vals
@@ -166,7 +166,7 @@ def cde_pvs_by_id_with_version_get(request: Request, id: str, version: str, use_
       WHERE pv IS NOT NULL
     // Find any synonyms associated with the NCIt term in the NCI Metathesaurus data
     OPTIONAL MATCH (ncit_term)-[:represents]->(c_ncim:concept)<-[:represents]-(syn:term), (c_ncim)-[:has_tag]->(:tag {{key: "mapping_source", value: "NCIm"}})
-      WHERE pv IS NOT NULL AND pv <> syn and pv.value <> syn.value
+      WHERE pv IS NOT NULL AND (syn IS NULL OR (pv <> syn AND pv.value <> syn.value))
     WITH n0, value_set_url,
       CASE WHEN pv IS NULL THEN null ELSE pv.value END as pv_val,
       collect(DISTINCT ncit_term.origin_id)[0] AS ncit_oid,
