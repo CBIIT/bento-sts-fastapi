@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, Request
 from typing import List
-from ..dependencies import paging_params
+from ..dependencies import paging_params_tags
 from ..converters import neo_to_py
 from ..pymodels import Tag
 
@@ -13,7 +13,7 @@ router = APIRouter(
 @router.get(
     "/",
     summary="Get all tag nodes in MDB",
-    dependencies=[Depends(paging_params)],
+    dependencies=[Depends(paging_params_tags)],
     responses={
         200: {"description": "Successful Response"},
         404: {"description": "Not found."},

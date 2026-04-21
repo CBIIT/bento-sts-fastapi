@@ -8,7 +8,7 @@ class Entity(BaseModel):
     type: str
     handle: str | None = None
     version: str | None = None
-    nanoid: str
+    nanoid: str | None = None
 
 
 class Model(Entity):
@@ -48,14 +48,14 @@ class Term(BaseModel):
     handle: str | None = None
     origin_version: str | None = None
     origin_id: str | None = None
-    nanoid: str
+    nanoid: str | None = None
 
 
 class Tag(BaseModel):
     type: Literal['Tag'] = 'Tag'
     key: str
     value: str | bool
-    nanoid: str
+    nanoid: str | None = None
 
 
 class Relationship(Entity):
