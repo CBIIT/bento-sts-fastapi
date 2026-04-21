@@ -78,27 +78,20 @@ def pvs_synonyms_model_version_get(request: Request, model: str, property: str =
     OPTIONAL MATCH (null_vs:value_set {{handle: "{NULL_CDE_ID}"}})-[:has_term]->(null_pv:term)
     WITH prop, CDECode, CDEVersion, CDEFullName, model_pvs, cde_pvs, has_cde, should_use_null_cde,
       CASE WHEN should_use_null_cde THEN COLLECT(DISTINCT null_pv) ELSE [] END AS null_pvs
-    // Get all unique alternate values for all CDE PVs 
-    UNWIND CASE WHEN size(cde_pvs) > 0 THEN cde_pvs ELSE [null] END AS temp_pv
-    OPTIONAL MATCH (temp_pv)-[:represents]->(c_alt:concept)<-[:represents]-(alt_pv:term {{origin_name: "caDSR_alternates"}}), (c_alt)-[:has_tag]->(:tag {{key: "mapping_source", value: "alternate_name"}})
-      WHERE temp_pv <> alt_pv AND alt_pv.value IS NOT NULL
-    WITH prop, CDECode, CDEVersion, CDEFullName, model_pvs, cde_pvs, null_pvs, has_cde, should_use_null_cde,
-      collect(DISTINCT alt_pv.value) AS alternate_values
     // Determine which PV set to use based on availability and content
-    WITH prop, CDECode, CDEVersion, CDEFullName, model_pvs, cde_pvs, null_pvs, alternate_values, has_cde,
+    WITH prop, CDECode, CDEVersion, CDEFullName, model_pvs, cde_pvs, null_pvs, has_cde,
       CASE WHEN has_cde and size(cde_pvs) > 0 AND ANY(p in cde_pvs WHERE p.value =~ "https?://.*")
           THEN true
         WHEN has_cde and size(cde_pvs) > 0 AND NONE(p in cde_pvs WHERE p.value =~ "https?://.*")
           THEN false
         ELSE true 
       END AS fall_back_to_model_pvs
-    WITH prop, CDECode, CDEVersion, CDEFullName, model_pvs, fall_back_to_model_pvs, CASE WHEN fall_back_to_model_pvs THEN [] ELSE cde_pvs END AS pvs, null_pvs, CASE WHEN fall_back_to_model_pvs THEN [] ELSE alternate_values END AS alternate_values
+    WITH prop, CDECode, CDEVersion, CDEFullName, model_pvs, fall_back_to_model_pvs, CASE WHEN fall_back_to_model_pvs THEN [] ELSE cde_pvs END AS pvs, null_pvs
     WITH prop, model_pvs, all(x IN collect(fall_back_to_model_pvs) WHERE x = true) AS overall_fall_back_flag, 
                           apoc.coll.toSet(apoc.coll.flatten(collect(DISTINCT pvs))) as pvs_list,
-                          apoc.coll.toSet(apoc.coll.flatten(collect(DISTINCT null_pvs))) as null_pvs_list,
-                          apoc.coll.toSet(apoc.coll.flatten(collect(DISTINCT alternate_values))) as alternate_values_list
-    WITH prop, case when overall_fall_back_flag then model_pvs else pvs_list end as pvs, null_pvs_list, alternate_values_list
-    WITH prop, alternate_values_list,
+                          apoc.coll.toSet(apoc.coll.flatten(collect(DISTINCT null_pvs))) as null_pvs_list
+    WITH prop, case when overall_fall_back_flag then model_pvs else pvs_list end as pvs, null_pvs_list
+    WITH prop,
      apoc.coll.toSet(
        (CASE WHEN size(pvs) > 0 THEN pvs ELSE [] END) +
        (CASE WHEN size(null_pvs_list) > 0 THEN null_pvs_list ELSE [] END)
@@ -108,21 +101,14 @@ def pvs_synonyms_model_version_get(request: Request, model: str, property: str =
     OPTIONAL MATCH (pv)-[:represents]->(c_cadsr:concept)<-[:represents]-(ncit_term:term {{origin_name: "NCIt"}}), (c_cadsr)-[:has_tag]->(:tag {{key: "mapping_source", value: "caDSR"}})
     // Find any synonyms associated with the NCIt term in the NCI Metathesaurus data
     OPTIONAL MATCH (ncit_term)-[:represents]->(c_ncim:concept)<-[:represents]-(syn:term), (c_ncim)-[:has_tag]->(:tag {{key: "mapping_source", value: "NCIm"}})
-      WHERE pv <> syn and pv.value <> syn.value
-    WITH prop, alternate_values_list, pv.value AS pv_val,
+      WHERE syn IS NULL OR (pv <> syn AND pv.value <> syn.value)
+    WITH prop, pv.value AS pv_val,
       collect(DISTINCT ncit_term.origin_id)[0] AS ncit_oid,
       collect(DISTINCT syn.value) + [x IN collect(DISTINCT ncit_term.value) WHERE x IS NOT NULL] AS syn_vals
     // Format the PVs with their synonyms and NCIt codes
-    WITH prop, alternate_values_list,
+    WITH prop,
       [pv_item IN apoc.coll.toSet(apoc.coll.flatten(collect(DISTINCT {{value: pv_val, synonyms: syn_vals, ncit_concept_code: ncit_oid}}))) WHERE pv_item.value IS NOT NULL] AS formatted_pvs
-    // Extract regular PV values for deduplication
-    WITH prop, formatted_pvs,
-      [pv IN formatted_pvs | pv.value] AS regular_pv_values, alternate_values_list
-    // Filter out null PVs and alternates in regular PVs
-    WITH prop, formatted_pvs,
-      [val IN alternate_values_list WHERE NOT val IN regular_pv_values | {{value: val, synonyms: []}}] AS formatted_alts
-    // Combine formatted PVs with filtered null PVs and alternates PVs
-    WITH prop, formatted_pvs + formatted_alts AS all_pvs
+    WITH prop, formatted_pvs AS all_pvs
     // Return the results with pagination support
 
     RETURN DISTINCT $p0 AS model, $p1 AS version,
@@ -167,17 +153,11 @@ def cde_pvs_by_id_with_version_get(request: Request, id: str, version: str, use_
     OPTIONAL MATCH (null_vs:value_set {{handle: "{NULL_CDE_ID}"}})-[:has_term]->(null_pv:term)
     WITH n0, value_set_url, pvs,
       CASE WHEN {use_null} THEN COLLECT(DISTINCT null_pv) ELSE [] END AS null_pvs
-    // Get all unique alternate values for CDE PVs only (not null PVs)
-    UNWIND CASE WHEN size(pvs) > 0 THEN pvs ELSE [null] END AS temp_pv
-    OPTIONAL MATCH (temp_pv)-[:represents]->(c_alt:concept)<-[:represents]-(alt_pv:term {{origin_name: "caDSR_alternates"}}), (c_alt)-[:has_tag]->(:tag {{key: "mapping_source", value: "alternate_name"}})
-      WHERE temp_pv IS NOT NULL AND temp_pv <> alt_pv AND alt_pv.value IS NOT NULL
-    WITH n0, value_set_url, pvs, null_pvs,
-      collect(DISTINCT alt_pv.value) AS alternate_values
     // Get regular PV values for deduplication
-    WITH n0, value_set_url, pvs, null_pvs, alternate_values,
+    WITH n0, value_set_url, pvs, null_pvs,
       [pv IN pvs | pv.value] AS regular_pv_values
     // Combine regular PVs with null PVs (exclude duplicates)
-    WITH n0, value_set_url, alternate_values,
+    WITH n0, value_set_url,
       pvs + [npv IN null_pvs WHERE NOT npv.value IN regular_pv_values] AS all_pvs_combined
     // Process all PVs together (regular + null)
     UNWIND CASE WHEN size(all_pvs_combined) > 0 THEN all_pvs_combined ELSE [null] END AS pv
@@ -186,23 +166,15 @@ def cde_pvs_by_id_with_version_get(request: Request, id: str, version: str, use_
       WHERE pv IS NOT NULL
     // Find any synonyms associated with the NCIt term in the NCI Metathesaurus data
     OPTIONAL MATCH (ncit_term)-[:represents]->(c_ncim:concept)<-[:represents]-(syn:term), (c_ncim)-[:has_tag]->(:tag {{key: "mapping_source", value: "NCIm"}})
-      WHERE pv IS NOT NULL AND pv <> syn and pv.value <> syn.value
-    WITH n0, value_set_url, alternate_values,
+      WHERE pv IS NOT NULL AND (syn IS NULL OR (pv <> syn AND pv.value <> syn.value))
+    WITH n0, value_set_url,
       CASE WHEN pv IS NULL THEN null ELSE pv.value END as pv_val,
       collect(DISTINCT ncit_term.origin_id)[0] AS ncit_oid,
       collect(DISTINCT syn.value) + [x IN collect(DISTINCT ncit_term.value) WHERE x IS NOT NULL] AS syn_vals
     // Format the PVs with their synonyms and NCIt codes
-    WITH n0, value_set_url, alternate_values,
+    WITH n0, value_set_url,
       CASE WHEN pv_val IS NULL THEN [] ELSE collect({{value: pv_val, synonyms: syn_vals, ncit_concept_code: ncit_oid}}) END AS permissibleValues
-    // Extract all PV values for alternate deduplication
-    WITH n0, permissibleValues,
-      [pv IN permissibleValues | pv.value] AS all_pv_values,
-      alternate_values
-    // Filter out alternates already in PVs
-    WITH n0, permissibleValues,
-      [val IN alternate_values WHERE NOT val IN all_pv_values | {{value: val, ncit_concept_code: null, synonyms: []}}] AS formatted_alts
-    // Combine formatted PVs with alternates
-    WITH n0, permissibleValues + formatted_alts AS all_pvs
+    WITH n0, permissibleValues AS all_pvs
     // Return the CDE information with pagination support
     WITH n0.origin_id AS CDECode, n0.origin_version AS CDEVersion,
       n0.value AS CDEFullName, 
