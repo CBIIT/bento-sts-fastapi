@@ -9,6 +9,7 @@ classifiers = [
     "License :: OSI Approved :: Apache Software License"
 ]
 dependencies = [
+    "cachetools>=5.0",
     "cryptography>=46.0.5",
     "fastapi[standard]>=0.118.0",
     "neo4j>=6.0.2",

@@ -10,12 +10,14 @@ from functools import wraps
 from neo4j import GraphDatabase
 from dotenv import load_dotenv
 from fastapi import HTTPException
-from pdb import set_trace
+from cachetools import TTLCache
 
 # Decorator functions to produce executed transactions based on an
 # underlying query/param function:
 
-logger = logging.getLogger()
+logger = logging.getLogger(__name__)
+# Uvicorn already attaches handlers to uvicorn.error; avoids extra app-level logging setup.
+_cache_log = logging.getLogger("uvicorn.error")
 load_dotenv()
 
 def read_txn(func):
@@ -55,6 +57,10 @@ class MDBReader(object):
         self.uri = uri
         self.user = user
         self.password = password
+        self._cache = TTLCache(
+            maxsize=int(os.environ.get("STS_CACHE_MAXSIZE", 4096)),
+            ttl=int(os.environ.get("STS_CACHE_TTL", 172800)),
+        )
         try:
             self.driver = GraphDatabase.driver(
                 self.uri, auth=(self.user, self.password)
@@ -66,13 +72,33 @@ class MDBReader(object):
         self.driver.close()
         
     @read_txn
-    def get_with_statement(self, qry: str, parms: dict = {}):
-        """Run an arbitrary read statement and return data.
-        
+    def _execute_query(self, qry: str, parms: dict = {}):
+        return (qry, parms)
+
+    def get_with_statement(self, qry: str, parms: dict = {}, raise_on_empty: bool = True):
+        """Run an arbitrary read statement, returning cached results when available.
+
+        Results are cached for 24 hours (TTL=86400s). Cache misses execute the query
+        against Neo4j. HTTPException(404) responses are never cached.
+
         Args:
             qry: Cypher query string
             parms: Query parameters
             raise_on_empty: If True (default), raises HTTPException(404) when no results found.
                           If False, returns empty list when no results found.
         """
-        return (qry, parms)
+        key = (qry, tuple(sorted(parms.items())), raise_on_empty)
+        if key in self._cache:
+            preview = qry.split("\n")[0].strip()[:60]
+            parms_str = f" parms={parms}" if parms else ""
+            _cache_log.info("mdb cache HIT  [size=%d] query='%s'%s", len(self._cache), preview, parms_str)
+            return self._cache[key]
+        result = self._execute_query(qry, parms, raise_on_empty=raise_on_empty)
+        self._cache[key] = result
+        return result
+
+    def clear_cache(self):
+        """Invalidate all cached query results."""
+        count = len(self._cache)
+        self._cache.clear()
+        _cache_log.info("mdb cache cleared (%d entries evicted)", count)
