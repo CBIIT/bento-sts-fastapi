@@ -1,5 +1,9 @@
-from fastapi import APIRouter
-from ..dependencies import mdb
+from typing import Annotated
+
+from fastapi import APIRouter, Depends
+
+from ..dependencies import get_mdb
+from ..mdb import MDBReader
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
@@ -11,11 +15,11 @@ router = APIRouter(prefix="/admin", tags=["admin"])
         200: {"description": "Cache cleared successfully."},
     },
 )
-def cache_clear():
+def cache_clear(mdb_reader: Annotated[MDBReader, Depends(get_mdb)]):
     """Invalidate all cached Neo4j query results immediately.
 
     Call this after a daily MDB data update to ensure subsequent requests
     reflect the latest data rather than serving stale cached results.
     """
-    mdb.clear_cache()
+    mdb_reader.clear_cache()
     return {"status": "cache cleared"}

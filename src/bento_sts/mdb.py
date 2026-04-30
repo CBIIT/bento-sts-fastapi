@@ -78,8 +78,9 @@ class MDBReader(object):
     def get_with_statement(self, qry: str, parms: dict = {}, raise_on_empty: bool = True):
         """Run an arbitrary read statement, returning cached results when available.
 
-        Results are cached for 24 hours (TTL=86400s). Cache misses execute the query
-        against Neo4j. HTTPException(404) responses are never cached.
+        Results are cached using the configured `STS_CACHE_TTL`, which defaults to
+        172800 seconds (48 hours). Cache misses execute the query against Neo4j.
+        HTTPException(404) responses are never cached.
 
         Args:
             qry: Cypher query string
