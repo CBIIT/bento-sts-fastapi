@@ -2,7 +2,7 @@ import semver
 from fastapi import Depends, FastAPI, APIRouter
 from importlib.metadata import version as pkg_version
 from .dependencies import get_mdb
-from .routers import id, model, models, tag, tags, terms
+from .routers import id, model, models, tag, tags, terms, edps, edp
 
 app = FastAPI(
     title="Simple Terminology Server",
@@ -19,7 +19,7 @@ queried via this interface. Data models are stored in an instance of a
 )
 
 vrouter = APIRouter(
-    prefix="/v"+str(semver.Version.parse(pkg_version("bento-sts")).major)
+    prefix="/v" + str(semver.Version.parse(pkg_version("bento-sts")).major)
 )
 vrouter.include_router(id.router)
 vrouter.include_router(model.router)
@@ -27,7 +27,8 @@ vrouter.include_router(models.router)
 vrouter.include_router(tag.router)
 vrouter.include_router(tags.router)
 vrouter.include_router(terms.router)
-
+vrouter.include_router(edps.router)
+vrouter.include_router(edp.router)
 app.include_router(vrouter)
 
 

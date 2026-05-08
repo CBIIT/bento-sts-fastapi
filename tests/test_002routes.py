@@ -408,6 +408,91 @@ class TestTermsRouter:
         assert result[0]['permissibleValues'] == []
 
 
+class TestEdpsRouter:
+    """Tests for /edps endpoints"""
+
+    def test_edps_get_by_origin(self, test_sts_client):
+        response = test_sts_client.get("/v2/edps/caDSR")
+        assert response.status_code == 200
+        assert isinstance(response.json(), list)
+
+    def test_edps_get_by_origin_with_pagination(self, test_sts_client):
+        response = test_sts_client.get("/v2/edps/caDSR?skip=0&limit=5")
+        assert response.status_code == 200
+        assert isinstance(response.json(), list)
+        assert len(response.json()) <= 5
+
+    def test_edps_get_by_origin_nonexistent(self, test_sts_client):
+        response = test_sts_client.get("/v2/edps/nonexistent_origin")
+        assert response.status_code in [200, 404]
+        if response.status_code == 200:
+            assert response.json() == []
+
+    def test_edps_get_returns_term_objects(self, test_sts_client):
+        response = test_sts_client.get("/v2/edps/caDSR?limit=1")
+        assert response.status_code == 200
+        if response.json():
+            term = response.json()[0]
+            assert "value" in term
+            assert "type" in term
+
+
+class TestEdpRouter:
+    """Tests for /edp endpoints"""
+
+    def test_edp_pvs_by_origin_id_version(self, test_sts_client):
+        # First get an EDP term to find valid origin/id/version
+        edps_response = test_sts_client.get("/v2/edps/caDSR?limit=1")
+        if edps_response.status_code == 200 and edps_response.json():
+            term = edps_response.json()[0]
+            origin_id = term.get("origin_id")
+            origin_version = term.get("origin_version")
+            if origin_id and origin_version:
+                response = test_sts_client.get(
+                    f"/v2/edp/caDSR/{origin_id}/{origin_version}/terms"
+                )
+                assert response.status_code == 200
+                assert isinstance(response.json(), list)
+
+    def test_edp_pvs_by_origin_id_version_nonexistent(self, test_sts_client):
+        response = test_sts_client.get(
+            "/v2/edp/caDSR/9999999/99.99/terms"
+        )
+        assert response.status_code in [200, 404]
+        if response.status_code == 200:
+            assert response.json() == []
+
+    def test_edp_pvs_by_origin_id_version_with_pagination(self, test_sts_client):
+        edps_response = test_sts_client.get("/v2/edps/caDSR?limit=1")
+        if edps_response.status_code == 200 and edps_response.json():
+            term = edps_response.json()[0]
+            origin_id = term.get("origin_id")
+            origin_version = term.get("origin_version")
+            if origin_id and origin_version:
+                response = test_sts_client.get(
+                    f"/v2/edp/caDSR/{origin_id}/{origin_version}/terms?skip=0&limit=5"
+                )
+                assert response.status_code == 200
+                assert isinstance(response.json(), list)
+                assert len(response.json()) <= 5
+
+    def test_edp_pvs_returns_term_objects(self, test_sts_client):
+        edps_response = test_sts_client.get("/v2/edps/caDSR?limit=1")
+        if edps_response.status_code == 200 and edps_response.json():
+            term = edps_response.json()[0]
+            origin_id = term.get("origin_id")
+            origin_version = term.get("origin_version")
+            if origin_id and origin_version:
+                response = test_sts_client.get(
+                    f"/v2/edp/caDSR/{origin_id}/{origin_version}/terms"
+                )
+                assert response.status_code == 200
+                if response.json():
+                    pv_term = response.json()[0]
+                    assert "value" in pv_term
+                    assert "type" in pv_term
+
+
 class TestEdgeCases:
     """Test edge cases and error handling"""
     
