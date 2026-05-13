@@ -59,7 +59,7 @@ class MDBReader(object):
         self.password = password
         self._cache = TTLCache(
             maxsize=int(os.environ.get("STS_CACHE_MAXSIZE", 4096)),
-            ttl=int(os.environ.get("STS_CACHE_TTL", 172800)),
+            ttl=int(os.environ.get("STS_CACHE_TTL", 28800)),
         )
         try:
             self.driver = GraphDatabase.driver(
@@ -79,7 +79,7 @@ class MDBReader(object):
         """Run an arbitrary read statement, returning cached results when available.
 
         Results are cached using the configured `STS_CACHE_TTL`, which defaults to
-        172800 seconds (48 hours). Cache misses execute the query against Neo4j.
+        28800 seconds (8 hours). Cache misses execute the query against Neo4j.
         HTTPException(404) responses are never cached.
 
         Args:
