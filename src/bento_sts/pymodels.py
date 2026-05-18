@@ -71,6 +71,13 @@ class ValueSet(Entity):
     type: Literal['ValueSet'] = 'ValueSet'
 
 
+class Origin(Entity):
+    type: Literal['Origin'] = 'Origin'
+    name: str
+    url: str | None = None
+    desc: str | None = None
+
+
 class Predicate(Entity):
     type: Literal['Predicate'] = 'Predicate'
 
@@ -115,3 +122,10 @@ class PropertyResponse(Entity, PropertyBase):
     """Response model for /node/{nodeHandle}/properties endpoint"""
     type: Literal['Property'] = 'Property'
     desc: str | None = None
+
+
+# neo_to_py output for GET /v2/id/{nanoid}. Types are listed explicitly so JSON keeps
+# subclass fields (e.g. value_domain on Property); a plain Entity | … union would drop them.
+MdbNanoidResponse = (
+    Model | Node | Property | Relationship | Concept | ValueSet | Origin | Tag | Term
+)

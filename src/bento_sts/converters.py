@@ -3,7 +3,7 @@ from neo4j.graph import Node as neoNode
 from pydantic import BaseModel
 from .pymodels import (
     Model, Node, Property,
-    Relationship, Concept, ValueSet,
+    Relationship, Concept, ValueSet, Origin,
     Term, Tag, CDE,
 )
 from pdb import set_trace
@@ -22,6 +22,8 @@ def neo_to_py(neo_node: neoNode) -> BaseModel:
         returnCls = Concept
     elif 'value_set' in neo_node.labels:
         returnCls = ValueSet
+    elif 'origin' in neo_node.labels:
+        returnCls = Origin
     elif 'model' in neo_node.labels:
         returnCls = Model
     elif 'tag' in neo_node.labels:

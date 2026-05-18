@@ -3,7 +3,7 @@ import os
 from bento_sts.converters import neo_to_py, neo_to_cde
 from bento_sts.pymodels import (
     Model, Node, Property,
-    Relationship, Concept, ValueSet,
+    Relationship, Concept, ValueSet, Origin,
     Term, Tag, CDE,
 )
 
@@ -42,6 +42,16 @@ def test_ValueSet_to_py(test_sts_mdb):
     result = test_sts_mdb.get_with_statement("match (n:value_set) return n limit 1")
     vs = neo_to_py(result[0]['n'])
     assert isinstance(vs, ValueSet)
+
+
+def test_Origin_to_py(test_sts_mdb):
+    result = test_sts_mdb.get_with_statement(
+        "match (n:origin) return n limit 1", raise_on_empty=False
+    )
+    if not result:
+        pytest.skip("no origin nodes in test MDB")
+    origin = neo_to_py(result[0]['n'])
+    assert isinstance(origin, Origin)
 
 
 def test_Term_to_py(test_sts_mdb):
