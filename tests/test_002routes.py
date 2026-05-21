@@ -1,5 +1,19 @@
 # tests/test_routes.py
 import pytest
+from importlib.metadata import version as pkg_version
+
+
+class TestVersionRoot:
+    """Tests for /v2 base endpoint"""
+
+    def test_version_root_get(self, test_sts_client):
+        response = test_sts_client.get("/v2")
+        assert response.status_code == 200
+        assert response.json() == {
+            "application": "STS",
+            "status": "READY",
+            "version": pkg_version("bento-sts"),
+        }
 
 class TestTagsRouter:
     """Tests for /tags endpoints"""
@@ -427,4 +441,3 @@ class TestEdgeCases:
     def test_empty_path_params(self, test_sts_client):
         response = test_sts_client.get("/v2/model//versions")
         assert response.status_code == 404
-

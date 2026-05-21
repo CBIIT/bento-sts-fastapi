@@ -18,9 +18,27 @@ queried via this interface. Data models are stored in an instance of a
     dependencies=[Depends(get_mdb)]
 )
 
+VERSION_PREFIX = "/v" + str(semver.Version.parse(pkg_version("bento-sts")).major)
+
 vrouter = APIRouter(
-    prefix="/v"+str(semver.Version.parse(pkg_version("bento-sts")).major)
+    prefix=VERSION_PREFIX
 )
+
+
+def _ready_payload() -> dict[str, str]:
+    return {
+        "application": "STS",
+        "version": pkg_version("bento-sts"),
+        "status": "READY",
+    }
+
+
+@vrouter.get("")
+@vrouter.get("/")
+def version_root():
+    return _ready_payload()
+
+
 vrouter.include_router(id.router)
 vrouter.include_router(model.router)
 vrouter.include_router(models.router)
@@ -34,8 +52,4 @@ app.include_router(vrouter)
 
 @app.get("/")
 def root():
-    return {
-        "application": "STS",
-        "version": f"{pkg_version('bento-sts')}",
-        "status": "READY",
-    },
+    return _ready_payload()
