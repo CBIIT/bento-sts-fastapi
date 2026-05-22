@@ -441,3 +441,4 @@ class TestEdgeCases:
     def test_empty_path_params(self, test_sts_client):
         response = test_sts_client.get("/v2/model//versions")
         assert response.status_code == 404
+
