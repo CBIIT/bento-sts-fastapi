@@ -9,9 +9,9 @@ from fastapi import HTTPException
 from bento_sts.mdb import MDBReader
 
 
-def _cache_key(qry: str, parms: dict, raise_on_empty: bool):
+def _cache_key(generation: int, qry: str, parms: dict, raise_on_empty: bool):
     """Must match MDBReader.get_with_statement key construction."""
-    return (qry, tuple(sorted(parms.items())), raise_on_empty)
+    return (generation, qry, tuple(sorted(parms.items())), raise_on_empty)
 
 
 @pytest.fixture(autouse=True)
@@ -23,7 +23,7 @@ def reset_sts_mdb_cache_local(test_sts_mdb: MDBReader):
 def test_get_with_statement_miss_stores_entry_in_cache_local(test_sts_mdb: MDBReader):
     """On miss, result is written to TTLCache before return."""
     qry, parms = "RETURN 1 AS n", {}
-    key = _cache_key(qry, parms, True)
+    key = _cache_key(test_sts_mdb._cache_generation, qry, parms, True)
     assert key not in test_sts_mdb._cache
     assert len(test_sts_mdb._cache) == 0
 
@@ -48,7 +48,7 @@ def test_get_with_statement_returns_stored_object_identity_local(test_sts_mdb: M
 def test_get_with_statement_empty_list_stored_on_miss_local(test_sts_mdb: MDBReader):
     """raise_on_empty=False: zero-row result is still stored in _cache."""
     qry = "UNWIND [] AS x RETURN x AS n"
-    key = _cache_key(qry, {}, False)
+    key = _cache_key(test_sts_mdb._cache_generation, qry, {}, False)
     assert key not in test_sts_mdb._cache
 
     a = test_sts_mdb.get_with_statement(qry, {}, raise_on_empty=False)
@@ -85,15 +85,18 @@ def test_get_with_statement_parm_key_order_irrelevant_local(test_sts_mdb: MDBRea
 
 def test_get_with_statement_clear_cache_local(test_sts_mdb: MDBReader):
     qry, parms = "RETURN 1 AS n", {}
-    test_sts_mdb.get_with_statement(qry, parms)
+    old = test_sts_mdb.get_with_statement(qry, parms)
     test_sts_mdb.get_with_statement(qry, parms)
     assert len(test_sts_mdb._cache) == 1
 
+    old_generation = test_sts_mdb._cache_generation
     test_sts_mdb.clear_cache()
-    assert len(test_sts_mdb._cache) == 0
-
-    test_sts_mdb.get_with_statement(qry, parms)
+    assert test_sts_mdb._cache_generation == old_generation + 1
     assert len(test_sts_mdb._cache) == 1
+
+    new = test_sts_mdb.get_with_statement(qry, parms)
+    assert len(test_sts_mdb._cache) == 2
+    assert new is old
 
 
 def test_get_with_statement_raise_on_empty_in_cache_key_local(test_sts_mdb: MDBReader):
@@ -106,7 +109,7 @@ def test_get_with_statement_raise_on_empty_in_cache_key_local(test_sts_mdb: MDBR
 def test_get_with_statement_404_not_cached_local(test_sts_mdb: MDBReader):
     """Empty + raise_on_empty=True raises before cache write; repeat is still a miss."""
     qry = "UNWIND [] AS x RETURN x AS n"
-    key = _cache_key(qry, {}, True)
+    key = _cache_key(test_sts_mdb._cache_generation, qry, {}, True)
     with pytest.raises(HTTPException) as exc:
         test_sts_mdb.get_with_statement(qry, {}, raise_on_empty=True)
     assert exc.value.status_code == 404
