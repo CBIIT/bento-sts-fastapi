@@ -33,8 +33,8 @@ def _ready_payload() -> dict[str, str]:
     }
 
 
-@vrouter.get("")
-@vrouter.get("/")
+@vrouter.get("", include_in_schema=False)
+@vrouter.get("/", include_in_schema=False)
 def version_root():
     return _ready_payload()
 
@@ -50,6 +50,6 @@ vrouter.include_router(admin.router)
 app.include_router(vrouter)
 
 
-@app.get("/")
+@app.get("/", include_in_schema=False)
 def root():
     return _ready_payload()
