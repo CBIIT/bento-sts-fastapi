@@ -1,6 +1,6 @@
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Request
 from ..converters import neo_to_py
-from ..pymodels import Entity, Term
+from ..pymodels import MdbNanoidResponse
 
 router = APIRouter(
     prefix="/id",
@@ -17,7 +17,7 @@ router = APIRouter(
         422: {"description": "Bad parameters (id?)"},
     },
 )
-def id_id_get(request: Request, id: str) -> Entity | Term:
+def id_id_get(request: Request, id: str) -> MdbNanoidResponse:
     stmt = 'MATCH (n0 {nanoid:$p0}) RETURN n0'
     ret = request.state.mdb.get_with_statement(
         stmt,

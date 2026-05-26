@@ -5,7 +5,7 @@ from typing import Annotated
 from .mdb import MDBReader
 
 
-logger = getLogger()
+logger = getLogger(__name__)
 mdb = MDBReader()
 
 
