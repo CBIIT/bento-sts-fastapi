@@ -8,7 +8,8 @@ router = APIRouter(
     prefix="/edp",
     tags=["edp"],
     dependencies=[Depends(paging_params)],
-    )
+)
+
 
 @router.get(
     "/{originName}/{originId}/{originVersion}/terms",
@@ -25,7 +26,7 @@ def edp_pvs_by_origin_id_version_get(
     ):
     NULL_CDE_ID = '16476366|1'
     stmt = " ".join([
-        "MATCH (t:term {origin_name: $origin_name, origin_id: $origin_id,",
+        "MATCH (:term {origin_name: $origin_name, origin_id: $origin_id,",
         "               origin_version: $origin_version})",
         "-[:specifies_value_set]->(v:value_set)-[:has_term]->(t:term)",
         "return t",
