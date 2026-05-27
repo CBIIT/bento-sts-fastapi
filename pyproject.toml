@@ -32,5 +32,12 @@ dev = [
     "yapf>=0.43.0",
 ]
 
+[tool.hatch.build]
+include = ["src"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/bento_sts"]
+sources = ["src"]
+
 [tool.pytest.ini_options]
 addopts = "-s -k local"

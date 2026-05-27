@@ -1,4 +1,3 @@
-import semver
 from fastapi import Depends, FastAPI, APIRouter
 from importlib.metadata import version as pkg_version
 from .dependencies import get_mdb
@@ -19,7 +18,7 @@ queried via this interface. Data models are stored in an instance of a
 )
 
 vrouter = APIRouter(
-    prefix="/v" + str(semver.Version.parse(pkg_version("bento-sts")).major)
+    prefix="/v" + pkg_version("bento-sts").split(".")[0]
 )
 vrouter.include_router(id.router)
 vrouter.include_router(model.router)
