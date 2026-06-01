@@ -15,9 +15,8 @@ from cachetools import TTLCache
 # Decorator functions to produce executed transactions based on an
 # underlying query/param function:
 
-logger = logging.getLogger(__name__)
 # Uvicorn already attaches handlers to uvicorn.error; avoids extra app-level logging setup.
-_cache_log = logging.getLogger("uvicorn.error")
+logger = logging.getLogger("uvicorn.error")
 load_dotenv()
 
 def read_txn(func):
@@ -92,7 +91,7 @@ class MDBReader(object):
         if key in self._cache:
             preview = qry.split("\n")[0].strip()[:60]
             parms_str = f" parms={parms}" if parms else ""
-            _cache_log.info("mdb cache HIT  [size=%d] query='%s'%s", len(self._cache), preview, parms_str)
+            logger.info("mdb cache HIT  [size=%d] query='%s'%s", len(self._cache), preview, parms_str)
             return self._cache[key]
         result = self._execute_query(qry, parms, raise_on_empty=raise_on_empty)
         self._cache[key] = result
@@ -102,4 +101,4 @@ class MDBReader(object):
         """Invalidate all cached query results."""
         count = len(self._cache)
         self._cache.clear()
-        _cache_log.info("mdb cache cleared (%d entries evicted)", count)
+        logger.info("mdb cache cleared (%d entries evicted)", count)
