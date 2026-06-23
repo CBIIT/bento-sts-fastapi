@@ -1,6 +1,6 @@
 [project]
 name = "bento-sts"
-version = "2.0.0"
+version = "2.5.0-rc"
 description = "FastAPI implementation of Simple Terminology Service"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -31,6 +31,13 @@ dev = [
     "rope>=1.14.0",
     "yapf>=0.43.0",
 ]
+
+[tool.hatch.build]
+include = ["src"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/bento_sts"]
+sources = ["src"]
 
 [tool.pytest.ini_options]
 addopts = "-s -k local"

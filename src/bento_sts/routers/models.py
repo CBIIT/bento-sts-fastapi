@@ -1,4 +1,3 @@
-import semver
 from fastapi import APIRouter, Depends, Request, HTTPException
 from typing import List
 from functools import cmp_to_key
